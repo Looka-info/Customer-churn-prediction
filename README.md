@@ -3,7 +3,8 @@
 [![Python Version](https://img.shields.io/badge/python-3.11%20%7C%203.12-blue.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Code Style](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
-[![Tests: Pytest](https://img.shields.io/badge/tests-24%20passed-brightgreen.svg)](https://docs.pytest.org/)
+[![Tests: Pytest](https://img.shields.io/badge/tests-27%20passed-brightgreen.svg)](https://docs.pytest.org/)
+[![Release: v1.0](https://img.shields.io/badge/release-v1.0--frozen-blue.svg)](https://github.com/)
 
 An audited, scientifically qualified Machine Learning benchmark designed to classify customer attrition risk on the public IBM Telco dataset. Built with defensive **data-leakage prevention**, modular architecture, cross-validation uncertainty audits, feature ablation studies, SQL invariant verification, and extensive automated testing.
 
@@ -276,12 +277,26 @@ Logistic Regression Logistic Regression           0.0000          0.000         
   Gradient Boosting Logistic Regression          +0.0028          0.875                0.431                             False
 ```
 
-#### Defensible Repeated-CV Analysis (Nadeau-Bengio Corrected Resampled $t$-Test)
-Because standard paired $t$-tests on cross-validation folds violate the independence assumption (training folds overlap by 80%, underestimating variance and inflating Type I error rates), we evaluated a 3-repeated 5-fold CV (15 evaluations) with the **Nadeau-Bengio corrected resampled $t$-test**:
-* **Random Forest vs. Logistic Regression**: Mean Difference $= +0.0044$, Corrected $t = 0.955$, Corrected $p = 0.3559$.
-* **Gradient Boosting vs. Logistic Regression**: Mean Difference $= +0.0049$, Corrected $t = 0.815$, Corrected $p = 0.4287$.
+#### Defensible Repeated-CV Analysis (Nadeau–Bengio Corrected Resampled $t$-Test)
+Because standard paired $t$-tests on cross-validation folds violate the independence assumption (training folds overlap by 80%, underestimating variance and inflating Type I error rates), we implemented and evaluated the **Nadeau–Bengio corrected resampled $t$-test** (Nadeau & Bengio 2003; Bouckaert & Frank 2004) across a 3-repeated 5-fold cross-validation:
 
-> **Scientific Interpretation**: A non-significant $p$-value ($p > 0.05$) does **NOT** prove that two models are equivalent in general population performance (absence of evidence is not evidence of absence). Rather, it demonstrates that within the sample variance of these evaluations, the observed mean difference of $+0.0035$ to $+0.0044$ is smaller than fold-to-fold resampling variability ($\pm 0.020$).
+* **Experimental Design & Variables**:
+  * $N = 5,634$: Total sample size of the training dataset partition.
+  * $K = 5$: Number of folds per cross-validation repeat.
+  * $J = 3$: Number of independent repeats.
+  * $R = J \times K = 15$: Total number of paired resamples/evaluations.
+  * $n_{\text{train}} = 4,507$ ($80\%$ of $N$): Training sample size per fold.
+  * $n_{\text{test}} = 1,127$ ($20\%$ of $N$): Validation sample size per fold.
+  * Sample-Size Ratio: $\frac{n_{\text{test}}}{n_{\text{train}}} = \frac{1}{K - 1} = \frac{0.20}{0.80} = 0.2500$.
+  * Variance Correction Factor: $\left(\frac{1}{R} + \frac{n_{\text{test}}}{n_{\text{train}}}\right) = \left(\frac{1}{15} + 0.2498\right) \approx 0.3164$.
+  * Degrees of Freedom: $df = R - 1 = 15 - 1 = 14$.
+  * Test Statistic: $t_{\text{corrected}} = \frac{\bar{d}}{\sqrt{s^2 \left(\frac{1}{R} + \frac{n_{\text{test}}}{n_{\text{train}}}\right)}}$.
+
+* **Empirical Results ($R=15$ paired evaluations, $df=14$)**:
+  * **Random Forest vs. Logistic Regression**: Mean Difference $\bar{d} = +0.0044$, Sample Variance $s^2 = 0.000067$, Corrected $t = 0.955$, Two-Sided $p = 0.3557$.
+  * **Gradient Boosting vs. Logistic Regression**: Mean Difference $\bar{d} = +0.0049$, Sample Variance $s^2 = 0.000115$, Corrected $t = 0.815$, Two-Sided $p = 0.4285$.
+
+> **Scientific Interpretation**: A non-significant $p$-value ($p > 0.05$) does **NOT** prove that two models are equivalent in general population performance (absence of evidence is not evidence of absence). Rather, it demonstrates that within the sample variance of these evaluations, the observed mean difference of $+0.0044$ is smaller than fold-to-fold resampling variability ($\pm 0.020$). Model comparisons must be treated as evidence with uncertainty, not proof of equivalence.
 
 ### 3. Defensible Model Selection Decision
 * **Logistic Regression**: Most defensible under Occam's razor and regulatory transparency. Yields direct log-odds, runs with negligible latency, and achieves higher default recall ($0.5445$ vs $0.5137$) and F1 ($0.5932$ vs $0.5828$).
@@ -318,44 +333,61 @@ All metrics reflect actual execution (`reports/model_comparison.csv`):
 * The utility calculations below are **hypothetical expected-value scenarios** based on assumed unit parameters.
 * They do **NOT** represent demonstrated financial return on investment (ROI) or confirmed customer retention. Correctly identifying an at-risk subscriber (True Positive) does **not** prove that the subscriber can or will be persuaded to stay. In real operations, churners include non-persuadable departures (e.g., relocation outside service coverage, business closures).
 
-### 2. Assumed Scenario Parameter Values
-* Assumed False Positive Cost ($C_{FP}$): $20 (cost of unnecessary outreach or discount).
-* Assumed False Negative Cost ($C_{FN}$): $100 (lost customer lifetime gross margin).
-* Assumed True Positive Benefit ($B_{TP}$): $80 (net lifetime margin preserved under successful intervention).
+### 2. Financial Objective: Option A (Incremental Campaign Value vs. No Outreach)
+We evaluate the financial objective defined strictly as the **incremental value of an outreach intervention campaign compared to a baseline of no outreach**:
+$$\mathbf{\Delta \text{Value} = (\text{TP} \times \eta \times V) - (\text{TP} + \text{FP}) \times C_{\text{outreach}}}$$
+
+**Rigorous Derivation & False-Negative Invariant**:
+* **Baseline Scenario ($H_0$: No Outreach)**:
+  * No customers contacted $\implies$ Outreach cost $= \$0$.
+  * All true churners ($\text{TP} + \text{FN}$) depart $\implies$ Baseline Churn Loss $= -(\text{TP} + \text{FN}) \times V$.
+* **Campaign Scenario ($H_1$: Targeted Outreach)**:
+  * Contacts $\text{TP} + \text{FP}$ accounts at cost $C_{\text{outreach}}$ each $\implies$ Total Outreach Cost $= (\text{TP} + \text{FP}) \times C_{\text{outreach}}$.
+  * Fraction $\eta$ of contacted churners accept the retention offer and stay $\implies$ Preserved Gross Value $= (\text{TP} \times \eta) \times V$.
+  * Customers who still churn under the campaign: unpersuaded true churners $\text{TP} \times (1 - \eta)$ plus uncontacted/missed churners $\text{FN} \implies$ Campaign Churn Loss $= -[\text{TP} \times (1 - \eta) + \text{FN}] \times V$.
+* **Incremental Campaign Value**:
+  $$\Delta \text{Value} = \text{Campaign Value} - \text{Baseline Value}$$
+  $$\Delta \text{Value} = \left[(\text{TP} \times \eta \times V) - [\text{TP} \times (1 - \eta) + \text{FN}] \times V - (\text{TP} + \text{FP}) \times C_{\text{outreach}}\right] - \left[-(\text{TP} + \text{FN}) \times V\right]$$
+  $$= (\text{TP} \times \eta \times V) - (\text{TP} + \text{FP}) \times C_{\text{outreach}}$$
+
+Because false negatives ($\text{FN} \times V$) and unpersuaded churners ($\text{TP} \times (1 - \eta) \times V$) churn in both scenarios, their baseline losses cancel out algebraically. Separately subtracting $\text{FN} \times V$ from the incremental campaign value would confound the campaign return with baseline losses that happen regardless of outreach.
+
+### 3. Training Out-of-Fold Threshold Trade-offs & Incremental Value
+Evaluated strictly on training out-of-fold predictions with Moderate parameters ($\eta = 30\%$, $V = \$120$, $C_{\text{outreach}} = \$20$):
 
 ```text
-TRAINING OUT-OF-FOLD THRESHOLD TRADE-OFFS & HYPOTHETICAL EXPECTED VALUE:
- threshold  precision  recall     f1  churners_identified_tp  false_alarms_fp  retained_correct_tn  missed_churners_fn  hypothetical_expected_value
-      0.20     0.4619  0.8729 0.6042                    1305             1520                 2619                 190                   +$55,000.0
-      0.25     0.5028  0.8334 0.6272                    1246             1232                 2907                 249                   +$50,140.0
-      0.30     0.5335  0.7779 0.6329                    1163             1017                 3122                 332                   +$39,500.0
-      0.35     0.5649  0.7251 0.6350                    1084              835                 3304                 411                   +$28,920.0
-      0.40     0.6051  0.6528 0.6281                     976              637                 3502                 519                   +$13,440.0
-      0.45     0.6370  0.5846 0.6097                     874              498                 3641                 621                    -$2,140.0
-      0.50     0.6731  0.5137 0.5827                     768              373                 3766                 727                   -$18,720.0
-      0.60     0.7282  0.3244 0.4489                     485              181                 3958                1010                   -$65,820.0
-      0.70     0.8338  0.1846 0.3023                     276               55                 4084                1219                  -$100,920.0
+TRAINING OUT-OF-FOLD THRESHOLD TRADE-OFFS & OPTION A INCREMENTAL CAMPAIGN VALUE:
+ threshold  precision  recall     f1  contacted_accounts  churners_identified_tp  false_alarms_fp  incremental_campaign_value
+      0.20     0.4619  0.8729 0.6042                2825                    1305             1520                   -$9,520.0
+      0.25     0.5028  0.8334 0.6272                2478                    1246             1232                   -$4,704.0
+      0.30     0.5335  0.7779 0.6329                2180                    1163             1017                   -$1,732.0
+      0.35     0.5649  0.7251 0.6350                1919                    1084              835                     +$644.0
+      0.40     0.6051  0.6528 0.6281                1613                     976              637                   +$2,876.0
+      0.45     0.6370  0.5846 0.6097                1372                     874              498                   +$4,024.0
+      0.50     0.6731  0.5137 0.5827                1141                     768              373                   +$4,828.0
+      0.55     0.7065  0.4187 0.5258                 886                     626              260                   +$4,816.0
+      0.60     0.7282  0.3244 0.4489                 666                     485              181                   +$4,140.0
+      0.70     0.8338  0.1846 0.3023                 331                     276               55                   +$3,316.0
 ```
 
-### 3. Sensitivity Analysis Across Intervention Success Rates ($\eta$) and Costs
-To examine sensitivity to intervention effectiveness, we evaluated net expected value where only a fraction ($\eta$) of contacted churners are persuadable:
-$$\text{Net Value} = (\text{TP} \times \eta \times V) - (\text{TP} + \text{FP}) \times C_{\text{outreach}} - (\text{FN} \times V)$$
+### 4. Multi-Scenario Sensitivity Analysis (Option A vs. No Outreach)
+To examine sensitivity across operational environments, we evaluated net incremental campaign value across Conservative, Moderate, and Optimistic assumptions:
 
 ```text
-HYPOTHETICAL RETENTION INTERVENTION SENSITIVITY ANALYSIS (Training Out-Of-Fold Data):
-    scenario success_rate_eta unit_outreach_cost customer_value  threshold  churners_identified  hypothetical_persuaded  false_alarms  net_expected_value
-Conservative              15%                $25           $100       0.25                 1246                   186.9          1232            -$68,160.0
-Conservative              15%                $25           $100       0.35                 1084                   162.6           835            -$72,815.0
-Conservative              15%                $25           $100       0.50                  768                   115.2           373            -$89,705.0
-    Moderate              30%                $20           $120       0.25                 1246                   373.8          1232            -$34,584.0
-    Moderate              30%                $20           $120       0.35                 1084                   325.2           835            -$48,676.0
-    Moderate              30%                $20           $120       0.50                  768                   230.4           373            -$82,412.0
-  Optimistic              50%                $15           $150       0.25                 1246                   623.0          1232            +$18,930.0
-  Optimistic              50%                $15           $150       0.35                 1084                   542.0           835             -$9,135.0
-  Optimistic              50%                $15           $150       0.50                  768                   384.0           373            -$68,565.0
+HYPOTHETICAL RETENTION INTERVENTION SENSITIVITY ANALYSIS (Option A: Incremental Campaign Value vs. No Outreach):
+    scenario success_rate_eta unit_outreach_cost customer_value  threshold  contacted_accounts  churners_identified_tp  false_alarms_fp  persuaded_churners  gross_value_preserved  outreach_cost  incremental_campaign_value
+Conservative              15%                $25           $100       0.25                2478                    1246             1232               186.9              $18,690.0      $61,950.0                  -$43,260.0
+Conservative              15%                $25           $100       0.35                1919                    1084              835               162.6              $16,260.0      $47,975.0                  -$31,715.0
+Conservative              15%                $25           $100       0.50                1141                     768              373               115.2              $11,520.0      $28,525.0                  -$17,005.0
+    Moderate              30%                $20           $120       0.25                2478                    1246             1232               373.8              $44,856.0      $49,560.0                   -$4,704.0
+    Moderate              30%                $20           $120       0.35                1919                    1084              835               325.2              $39,024.0      $38,380.0                     +$644.0
+    Moderate              30%                $20           $120       0.50                1141                     768              373               230.4              $27,648.0      $22,820.0                   +$4,828.0
+  Optimistic              50%                $15           $150       0.25                2478                    1246             1232               623.0              $93,450.0      $37,170.0                  +$56,280.0
+  Optimistic              50%                $15           $150       0.35                1919                    1084              835               542.0              $81,300.0      $28,785.0                  +$52,515.0
+  Optimistic              50%                $15           $150       0.50                1141                     768              373               384.0              $57,600.0      $17,115.0                  +$40,485.0
 ```
 
-> **Key Takeaway**: When retention success rate is realistic ($\eta \le 30\%$), outreach costs can easily dominate preserved value unless outreach is highly targeted ($C \le \$15$) or customer value is high. Lowering thresholds identifies more churners (+77 additional churners identified at 0.35 on test data), but also multiplies false-alarm outreach costs.
+> **Key Takeaway**: Under realistic conversion rates ($\eta \le 30\%$), outreach costs dominate preserved value unless precision is high or contact costs are low. Threshold 0.50 yields the highest positive incremental campaign return (+$4,828.0) under Moderate parameters because its higher precision ($67.31\%$) avoids 859 false-alarm outreach contacts relative to threshold 0.25. Under Optimistic parameters ($\eta = 50\%$, $C = \$15$, $V = \$150$), casting a wider net (threshold 0.25) maximizes campaign return (+$56,280.0).
 
 ---
 
@@ -462,34 +494,37 @@ python -m pytest
 ============================= test session starts =============================
 platform win32 -- Python 3.12.10, pytest-9.1.1 -- D:\tools\python312\python.exe
 testpaths: tests
-collected 24 items
+collected 27 items
 
-tests/test_audit.py::test_threshold_tuning_uses_only_training_data PASSED [  4%]
-tests/test_audit.py::test_intervention_sensitivity_analysis PASSED       [  8%]
-tests/test_audit.py::test_cv_statistical_significance_calculator PASSED  [ 12%]
-tests/test_audit.py::test_defensible_model_selection_parsimony_strategy PASSED [ 16%]
-tests/test_audit.py::test_defensible_model_selection_tradeoff_strategy PASSED [ 20%]
-tests/test_audit.py::test_average_precision_metric_properties PASSED     [ 25%]
-tests/test_data.py::test_schema_validation_success PASSED                [ 29%]
-tests/test_data.py::test_schema_validation_missing_column PASSED         [ 33%]
-tests/test_data.py::test_schema_validation_duplicate_ids PASSED          [ 37%]
-tests/test_data.py::test_clean_raw_data_handles_blank_total_charges PASSED [ 41%]
-tests/test_data.py::test_target_encoding PASSED                          [ 45%]
-tests/test_data.py::test_prepare_features_and_target_leakage_prevention PASSED [ 50%]
-tests/test_data.py::test_load_raw_data_missing_file_raises_error PASSED  [ 54%]
-tests/test_prediction.py::test_prediction_output_shape_and_probability_bounds PASSED [ 58%]
-tests/test_prediction.py::test_prediction_handles_dictionary_input PASSED [ 62%]
-tests/test_prediction.py::test_prediction_validation_catches_missing_columns PASSED [ 66%]
-tests/test_prediction.py::test_prediction_safely_removes_customer_id_and_churn PASSED [ 70%]
-tests/test_prediction.py::test_predictor_missing_model_file_error PASSED [ 75%]
-tests/test_preprocessing.py::test_build_preprocessor_handles_missing_and_scaling PASSED [ 79%]
-tests/test_preprocessing.py::test_preprocessor_handles_unseen_categories PASSED [ 83%]
-tests/test_preprocessing.py::test_create_train_test_split_stratification_and_seed PASSED [ 87%]
-tests/test_training.py::test_candidate_models_contain_required_classifiers PASSED [ 91%]
-tests/test_training.py::test_build_model_pipeline_returns_valid_pipeline PASSED [ 95%]
+tests/test_audit.py::test_threshold_tuning_uses_only_training_data PASSED [  3%]
+tests/test_audit.py::test_intervention_sensitivity_analysis PASSED       [  7%]
+tests/test_audit.py::test_incremental_campaign_value_hand_calculated_examples PASSED [ 11%]
+tests/test_audit.py::test_nadeau_bengio_corrected_ttest_hand_calculated_example PASSED [ 14%]
+tests/test_audit.py::test_nadeau_bengio_corrected_ttest_input_validation PASSED [ 18%]
+tests/test_audit.py::test_cv_statistical_significance_calculator PASSED  [ 22%]
+tests/test_audit.py::test_defensible_model_selection_parsimony_strategy PASSED [ 25%]
+tests/test_audit.py::test_defensible_model_selection_tradeoff_strategy PASSED [ 29%]
+tests/test_audit.py::test_average_precision_metric_properties PASSED     [ 33%]
+tests/test_data.py::test_schema_validation_success PASSED                [ 37%]
+tests/test_data.py::test_schema_validation_missing_column PASSED         [ 40%]
+tests/test_data.py::test_schema_validation_duplicate_ids PASSED          [ 44%]
+tests/test_data.py::test_clean_raw_data_handles_blank_total_charges PASSED [ 48%]
+tests/test_data.py::test_target_encoding PASSED                          [ 51%]
+tests/test_data.py::test_prepare_features_and_target_leakage_prevention PASSED [ 55%]
+tests/test_data.py::test_load_raw_data_missing_file_raises_error PASSED  [ 59%]
+tests/test_prediction.py::test_prediction_output_shape_and_probability_bounds PASSED [ 62%]
+tests/test_prediction.py::test_prediction_handles_dictionary_input PASSED [ 66%]
+tests/test_prediction.py::test_prediction_validation_catches_missing_columns PASSED [ 70%]
+tests/test_prediction.py::test_prediction_safely_removes_customer_id_and_churn PASSED [ 74%]
+tests/test_prediction.py::test_predictor_missing_model_file_error PASSED [ 77%]
+tests/test_preprocessing.py::test_build_preprocessor_handles_missing_and_scaling PASSED [ 81%]
+tests/test_preprocessing.py::test_preprocessor_handles_unseen_categories PASSED [ 85%]
+tests/test_preprocessing.py::test_create_train_test_split_stratification_and_seed PASSED [ 88%]
+tests/test_training.py::test_candidate_models_contain_required_classifiers PASSED [ 92%]
+tests/test_training.py::test_build_model_pipeline_returns_valid_pipeline PASSED [ 96%]
 tests/test_training.py::test_cross_validation_execution PASSED           [100%]
 
-======================== 24 passed, 1 warning in 3.39s ========================
+============================= 27 passed in 3.41s ==============================
 ```
 
 ---
