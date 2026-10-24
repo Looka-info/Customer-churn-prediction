@@ -62,37 +62,66 @@ def analyze_threshold_tradeoffs(
     y_train_oof: np.ndarray,
     probs_oof: np.ndarray,
     thresholds: Optional[List[float]] = None,
-    cost_fp: float = 20.0,
-    cost_fn: float = 100.0,
-    benefit_tp: float = 80.0,
+    persuadability_eta: float = 0.30,
+    customer_value: float = 120.0,
+    unit_outreach_cost: float = 20.0,
+    cost_fp: Optional[float] = None,
+    cost_fn: Optional[float] = None,
+    benefit_tp: Optional[float] = None,
 ) -> pd.DataFrame:
     """
-    Evaluate precision-recall-f1 trade-offs and hypothetical expected value strictly on
+    Evaluate precision-recall-f1 trade-offs and incremental campaign value strictly on
     out-of-fold training predictions. Never evaluates on the final test set to prevent leakage.
 
-    SCIENTIFIC QUALIFICATION:
-        The calculated 'hypothetical_expected_value' is a scenario-based expected-value exercise
-        derived from assumed unit parameters. It does NOT represent demonstrated financial return
-        on investment (ROI) or confirmed customer saves, because this dataset contains no
-        intervention history, contact channel records, or randomized uplift trial outcomes.
-        Flagging an at-risk customer (True Positive) does not prove that an outreach action
-        will successfully persuade that customer to remain.
+    FINANCIAL UTILITY OBJECTIVE (Option A: Incremental Campaign Value vs. No Outreach):
+        The financial objective is defined strictly as the incremental value of an outreach
+        intervention campaign compared to a baseline of no outreach:
+            Delta Value = Gross Value Preserved - Total Outreach Cost
+                        = (TP * eta * V) - (TP + FP) * C_outreach
 
-    Assumed Scenario Parameters:
-        - Cost of False Positive (cost_fp): Cost of unnecessary retention discount or outreach ($20 assumed).
-        - Cost of False Negative (cost_fn): Lost customer lifetime gross margin ($100 assumed).
-        - Benefit of True Positive (benefit_tp): Net value preserved under an assumed successful intervention ($80 assumed).
-        - Hypothetical Expected Value = (TP * benefit_tp) - (FP * cost_fp) - (FN * cost_fn)
+        Where:
+            - TP (True Positives): Actual churners correctly identified and flagged for outreach.
+            - FP (False Positives): Non-churners mistakenly flagged (wasted outreach expense).
+            - Contacted Accounts = TP + FP.
+            - eta (Persuadability): Fraction of contacted churners who accept the retention offer.
+            - V (Customer Value): Customer lifetime gross margin preserved if retained.
+            - C_outreach (Unit Outreach Cost): Cost of outreach/discount per contacted account.
+
+        Baseline Comparison & False-Negative Invariant:
+            In the no-outreach baseline, all actual churners (TP + FN) depart, incurring loss -(TP + FN) * V.
+            In the campaign, unpersuaded churners TP * (1 - eta) and missed churners FN still churn,
+            incurring churn loss -[TP * (1 - eta) + FN] * V.
+            The difference is:
+                Value_campaign - Value_baseline
+                = [(TP * eta * V) - [TP * (1 - eta) + FN] * V - (TP + FP) * C_outreach] - [-(TP + FN) * V]
+                = (TP * eta * V) - (TP + FP) * C_outreach
+            Therefore, false-negative churn losses (FN * V) cancel out identically and are NOT
+            separately subtracted from incremental campaign value, avoiding baseline confounding.
+
+    SCIENTIFIC QUALIFICATION:
+        This utility calculation is a hypothetical expected-value scenario based on assumed unit parameters.
+        It does NOT represent demonstrated financial return on investment (ROI) or confirmed saves,
+        because the observational dataset contains no randomized uplift trial or intervention logs.
     """
     if thresholds is None:
         thresholds = [0.20, 0.25, 0.30, 0.35, 0.40, 0.45, 0.50, 0.55, 0.60, 0.70]
+
+    # Support legacy parameter overrides if explicitly supplied
+    c = unit_outreach_cost if cost_fp is None else cost_fp
+    v = customer_value
+    eta = persuadability_eta
 
     rows = []
     for th in thresholds:
         m = compute_metrics(y_train_oof, probs_oof, threshold=th)
         cm = confusion_matrix(y_train_oof, (probs_oof >= th).astype(int))
         tn, fp, fn, tp = cm.ravel()
-        net_value = (tp * benefit_tp) - (fp * cost_fp) - (fn * cost_fn)
+
+        contacted = tp + fp
+        persuaded = tp * eta
+        gross_preserved = persuaded * v
+        outreach_cost = contacted * c
+        incremental_value = gross_preserved - outreach_cost
 
         rows.append(
             {
@@ -100,11 +129,17 @@ def analyze_threshold_tradeoffs(
                 "precision": round(m["precision"], 4),
                 "recall": round(m["recall"], 4),
                 "f1": round(m["f1"], 4),
+                "contacted_accounts": int(contacted),
                 "churners_identified_tp": int(tp),
                 "false_alarms_fp": int(fp),
                 "retained_correct_tn": int(tn),
                 "missed_churners_fn": int(fn),
-                "hypothetical_expected_value": round(float(net_value), 2),
+                "persuaded_churners": round(float(persuaded), 1),
+                "gross_value_preserved": round(float(gross_preserved), 2),
+                "outreach_cost": round(float(outreach_cost), 2),
+                "incremental_campaign_value": round(float(incremental_value), 2),
+                # Backwards-compatibility alias for existing references
+                "hypothetical_expected_value": round(float(incremental_value), 2),
             }
         )
 
@@ -118,15 +153,20 @@ def run_intervention_sensitivity_analysis(
 ) -> pd.DataFrame:
     """
     Sensitivity analysis over plausible retention intervention scenarios strictly on training OOF predictions.
-    Models the reality that only a fraction (retention success rate eta) of flagged churners can be persuaded to stay.
+    Evaluates Option A: Incremental Campaign Value vs. No Outreach across Conservative, Moderate,
+    and Optimistic parameters.
 
-    Formula:
-        Flagged Accounts = TP + FP
-        Outreach Cost = (TP + FP) * unit_outreach_cost
+    Option A Formula:
+        Contacted Accounts = TP + FP
         Persuaded Churners = TP * eta
-        Preserved Value = (TP * eta) * customer_value
-        Uncontacted Churn Loss = FN * customer_value
-        Net Expected Value = Preserved Value - Outreach Cost - Uncontacted Churn Loss
+        Gross Value Preserved = Persuaded Churners * customer_value = (TP * eta) * customer_value
+        Outreach Cost = Contacted Accounts * unit_outreach_cost = (TP + FP) * unit_outreach_cost
+        Incremental Campaign Value = Gross Value Preserved - Outreach Cost
+                                   = (TP * eta * customer_value) - (TP + FP) * unit_outreach_cost
+
+    Baseline Note:
+        False-negative churn losses (FN * customer_value) occur in both the no-outreach baseline
+        and the campaign, and therefore cancel out when measuring incremental campaign value over baseline.
     """
     if thresholds is None:
         thresholds = [0.25, 0.35, 0.50]
@@ -146,10 +186,11 @@ def run_intervention_sensitivity_analysis(
             cm = confusion_matrix(y_train_oof, (probs_oof >= th).astype(int))
             tn, fp, fn, tp = cm.ravel()
 
-            outreach_cost = (tp + fp) * c
-            preserved_value = tp * eta * v
-            uncontacted_loss = fn * v
-            net_expected_val = preserved_value - outreach_cost - uncontacted_loss
+            contacted = tp + fp
+            persuaded = tp * eta
+            gross_preserved = persuaded * v
+            outreach_cost = contacted * c
+            incremental_value = gross_preserved - outreach_cost
 
             rows.append(
                 {
@@ -158,10 +199,15 @@ def run_intervention_sensitivity_analysis(
                     "unit_outreach_cost": f"${c:.0f}",
                     "customer_value": f"${v:.0f}",
                     "threshold": th,
-                    "churners_identified": int(tp),
-                    "hypothetical_persuaded": round(tp * eta, 1),
-                    "false_alarms": int(fp),
-                    "net_expected_value": round(float(net_expected_val), 2),
+                    "contacted_accounts": int(contacted),
+                    "churners_identified_tp": int(tp),
+                    "false_alarms_fp": int(fp),
+                    "persuaded_churners": round(float(persuaded), 1),
+                    "gross_value_preserved": round(float(gross_preserved), 2),
+                    "outreach_cost": round(float(outreach_cost), 2),
+                    "incremental_campaign_value": round(float(incremental_value), 2),
+                    # Backwards compatibility alias
+                    "net_expected_value": round(float(incremental_value), 2),
                 }
             )
 

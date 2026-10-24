@@ -79,7 +79,8 @@ def test_preprocessor_handles_unseen_categories(feature_fixture):
         }
     )
 
-    transformed_unseen = preprocessor.transform(X_unseen)
+    with pytest.warns(UserWarning, match="Found unknown categories"):
+        transformed_unseen = preprocessor.transform(X_unseen)
     assert transformed_unseen.shape[0] == 1
     assert transformed_unseen.shape[1] == preprocessor.transform(X_train).shape[1]
     assert not np.isnan(transformed_unseen).any()

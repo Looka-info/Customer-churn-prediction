@@ -142,14 +142,28 @@ def run_pipeline() -> None:
     print("=" * 75 + "\n")
 
     # Statistical Significance Audit (Paired t-test across CV folds vs Baseline)
-    from churn_prediction.train import compute_cv_statistical_significance
+    from churn_prediction.train import (
+        compute_cv_statistical_significance,
+        run_repeated_cv_comparison,
+    )
     sig_pr = compute_cv_statistical_significance(oof_preds, baseline_model="Logistic Regression", metric_key="fold_pr_aucs")
     sig_roc = compute_cv_statistical_significance(oof_preds, baseline_model="Logistic Regression", metric_key="fold_roc_aucs")
-    print("STATISTICAL SIGNIFICANCE vs LOGISTIC REGRESSION BASELINE (PR-AUC):")
+    print("STATISTICAL SIGNIFICANCE vs LOGISTIC REGRESSION BASELINE (Single 5-Fold PR-AUC):")
     print(sig_pr.to_string(index=False))
-    print("\nSTATISTICAL SIGNIFICANCE vs LOGISTIC REGRESSION BASELINE (ROC-AUC):")
+    print("\nSTATISTICAL SIGNIFICANCE vs LOGISTIC REGRESSION BASELINE (Single 5-Fold ROC-AUC):")
     print(sig_roc.to_string(index=False))
     print()
+
+    # Repeated-CV Nadeau-Bengio Corrected Resampled t-Test (R=15 paired evaluations, df=14)
+    logger.info("Running 3-repeated 5-fold cross-validation with Nadeau-Bengio correction...")
+    repeated_cv_df = run_repeated_cv_comparison(
+        X_train, y_train, n_splits=5, n_repeats=3, random_state=config.random_seed, config=config
+    )
+    print("=" * 115)
+    print("REPEATED-CV STATISTICAL AUDIT (3-Repeated 5-Fold CV, R=15, Nadeau-Bengio Corrected Resampled t-Test):")
+    print("=" * 115)
+    print(repeated_cv_df.to_string(index=False))
+    print("=" * 115 + "\n")
 
     # Step 7: Defensible Model Selection
     logger.info("--- Step 7: Defensible Model Selection & Uncertainty Audit ---")
@@ -171,27 +185,27 @@ def run_pipeline() -> None:
     threshold_analysis = analyze_threshold_tradeoffs(
         best_oof["y_true"], best_oof["oof_probabilities"]
     )
-    print("=" * 85)
-    print("TRAINING OUT-OF-FOLD THRESHOLD TRADE-OFFS & HYPOTHETICAL EXPECTED VALUE")
-    print("=" * 85)
+    print("=" * 115)
+    print("TRAINING OUT-OF-FOLD THRESHOLD TRADE-OFFS & OPTION A INCREMENTAL CAMPAIGN VALUE")
+    print("=" * 115)
     print(threshold_analysis.to_string(index=False))
-    print("=" * 85)
+    print("=" * 115)
 
     # Multi-Scenario Intervention Sensitivity Analysis
     from churn_prediction.evaluate import run_intervention_sensitivity_analysis
     sensitivity_df = run_intervention_sensitivity_analysis(best_oof["y_true"], best_oof["oof_probabilities"])
-    print("\n" + "=" * 95)
-    print("HYPOTHETICAL RETENTION INTERVENTION SENSITIVITY ANALYSIS (Varying Success Rate eta & Outreach Cost)")
-    print("=" * 95)
+    print("\n" + "=" * 125)
+    print("HYPOTHETICAL RETENTION INTERVENTION SENSITIVITY ANALYSIS (Option A: Incremental Campaign Value vs. No Outreach)")
+    print("=" * 125)
     print(sensitivity_df.to_string(index=False))
-    print("=" * 95 + "\n")
+    print("=" * 125 + "\n")
 
-    best_thresh_idx = threshold_analysis["hypothetical_expected_value"].idxmax()
+    best_thresh_idx = threshold_analysis["incremental_campaign_value"].idxmax()
     optimal_thresh = float(threshold_analysis.loc[best_thresh_idx, "threshold"])
     logger.info(
-        "Training-side optimal expected-value threshold: %.2f (Hypothetical Expected Value: $%,.2f, Recall: %.1f%%, Precision: %.1f%%)",
+        "Training-side optimal expected-value threshold: %.2f (Incremental Campaign Value: $%.2f, Recall: %.1f%%, Precision: %.1f%%)",
         optimal_thresh,
-        threshold_analysis.loc[best_thresh_idx, "hypothetical_expected_value"],
+        threshold_analysis.loc[best_thresh_idx, "incremental_campaign_value"],
         threshold_analysis.loc[best_thresh_idx, "recall"] * 100,
         threshold_analysis.loc[best_thresh_idx, "precision"] * 100,
     )

@@ -5,9 +5,14 @@ import pandas as pd
 import pytest
 
 from churn_prediction.config import get_config
-from churn_prediction.evaluate import analyze_threshold_tradeoffs, compute_metrics
+from churn_prediction.evaluate import (
+    analyze_threshold_tradeoffs,
+    compute_metrics,
+    run_intervention_sensitivity_analysis,
+)
 from churn_prediction.train import (
     compute_cv_statistical_significance,
+    compute_nadeau_bengio_corrected_ttest,
     create_candidate_models,
     cross_validate_candidates,
     select_best_model,
@@ -76,7 +81,9 @@ def test_threshold_tuning_uses_only_training_data(train_val_fixture):
     df_thresh = analyze_threshold_tradeoffs(y_true, probs_rf)
 
     assert "threshold" in df_thresh.columns
+    assert "incremental_campaign_value" in df_thresh.columns
     assert "hypothetical_expected_value" in df_thresh.columns
+    assert "contacted_accounts" in df_thresh.columns
     assert "churners_identified_tp" in df_thresh.columns
     assert len(df_thresh) >= 5
 
@@ -87,19 +94,129 @@ def test_threshold_tuning_uses_only_training_data(train_val_fixture):
 
 def test_intervention_sensitivity_analysis(train_val_fixture):
     """
-    Audit Check: Verify multi-scenario sensitivity analysis computes expected value
-    across conservative, moderate, and optimistic retention success rates.
+    Audit Check: Verify multi-scenario sensitivity analysis computes Option A
+    incremental campaign value across conservative, moderate, and optimistic retention success rates.
     """
-    from churn_prediction.evaluate import run_intervention_sensitivity_analysis
-
     _, _, y_true, probs_rf = train_val_fixture
     sens_df = run_intervention_sensitivity_analysis(y_true, probs_rf)
 
     assert len(sens_df) == 9  # 3 scenarios * 3 thresholds
     assert "scenario" in sens_df.columns
     assert "success_rate_eta" in sens_df.columns
+    assert "contacted_accounts" in sens_df.columns
+    assert "incremental_campaign_value" in sens_df.columns
     assert "net_expected_value" in sens_df.columns
     assert set(sens_df["scenario"].unique()) == {"Conservative", "Moderate", "Optimistic"}
+
+
+def test_incremental_campaign_value_hand_calculated_examples():
+    """
+    Audit Check (Financial Objective Option A):
+        Verify that Incremental Campaign Value vs. No Outreach is:
+            Delta Value = (TP * eta * V) - (TP + FP) * C_outreach
+        and that false-negative churn losses (FN * V) are NOT subtracted, because
+        those losses also occur in the no-outreach baseline.
+    """
+    # Create controlled ground truth and prediction probabilities:
+    # 100 TPs (y=1, prob=0.9)
+    # 50  FPs (y=0, prob=0.8)
+    # 50  FNs (y=1, prob=0.1)
+    # 200 TNs (y=0, prob=0.2)
+    y_true = np.array([1] * 100 + [0] * 50 + [1] * 50 + [0] * 200)
+    probs = np.array([0.9] * 100 + [0.8] * 50 + [0.1] * 50 + [0.2] * 200)
+
+    # Threshold 0.50 selects exactly the 100 TPs and 50 FPs
+    # Hand calculation 1:
+    # eta = 0.25 (25% saved), V = $120, C = $20
+    # Contacted accounts = 100 + 50 = 150
+    # Outreach cost = 150 * 20 = $3,000.0
+    # Persuaded churners = 100 * 0.25 = 25.0
+    # Gross value preserved = 25.0 * 120 = $3,000.0
+    # Incremental campaign value = $3,000 - $3,000 = $0.0
+    df_eval1 = analyze_threshold_tradeoffs(
+        y_train_oof=y_true,
+        probs_oof=probs,
+        thresholds=[0.50],
+        persuadability_eta=0.25,
+        customer_value=120.0,
+        unit_outreach_cost=20.0,
+    )
+    row1 = df_eval1.iloc[0]
+    assert row1["churners_identified_tp"] == 100
+    assert row1["false_alarms_fp"] == 50
+    assert row1["contacted_accounts"] == 150
+    assert row1["persuaded_churners"] == 25.0
+    assert row1["gross_value_preserved"] == 3000.0
+    assert row1["outreach_cost"] == 3000.0
+    assert row1["incremental_campaign_value"] == 0.0
+
+    # Hand calculation 2:
+    # eta = 0.40, V = $100, C = $15
+    # Contacted accounts = 150
+    # Outreach cost = 150 * 15 = $2,250.0
+    # Persuaded churners = 100 * 0.40 = 40.0
+    # Gross value preserved = 40.0 * 100 = $4,000.0
+    # Incremental campaign value = $4,000 - $2,250 = +$1,750.0
+    df_eval2 = analyze_threshold_tradeoffs(
+        y_train_oof=y_true,
+        probs_oof=probs,
+        thresholds=[0.50],
+        persuadability_eta=0.40,
+        customer_value=100.0,
+        unit_outreach_cost=15.0,
+    )
+    row2 = df_eval2.iloc[0]
+    assert row2["persuaded_churners"] == 40.0
+    assert row2["gross_value_preserved"] == 4000.0
+    assert row2["outreach_cost"] == 2250.0
+    assert row2["incremental_campaign_value"] == 1750.0
+
+    # Mathematical Baseline Proof Check:
+    # Baseline: All 150 churners leave => Churn loss = -150 * $100 = -$15,000
+    # Campaign: 40 churners saved, so only (60 unpersuaded + 50 missed) = 110 churners leave => Churn loss = -$11,000
+    # Outreach cost = -$2,250 => Total campaign net loss = -$11,000 - $2,250 = -$13,250
+    # Incremental difference = Campaign - Baseline = -$13,250 - (-$15,000) = +$1,750.0
+    baseline_value = -(100 + 50) * 100.0
+    campaign_value = -((60.0 + 50.0) * 100.0) - 2250.0
+    assert (campaign_value - baseline_value) == row2["incremental_campaign_value"]
+
+
+def test_nadeau_bengio_corrected_ttest_hand_calculated_example():
+    """
+    Audit Check: Verify Nadeau-Bengio corrected resampled t-test using a small
+    analytically hand-calculated synthetic sequence of paired differences.
+    """
+    # 5 paired differences with known properties:
+    # diffs = [0.01, 0.02, 0.00, 0.03, 0.04]
+    # R = 5, df = 4
+    # mean d_bar = 0.0200
+    # variance s^2 = [(0.01 - 0.02)^2 + (0.02 - 0.02)^2 + (-0.02)^2 + (0.01)^2 + (0.02)^2] / 4
+    #              = [0.0001 + 0.0000 + 0.0004 + 0.0001 + 0.0004] / 4 = 0.0010 / 4 = 0.000250
+    # n_train = 800, n_test = 200 => ratio = 200 / 800 = 0.2500
+    # correction factor = 1/5 + 0.25 = 0.20 + 0.25 = 0.4500
+    # corrected variance = 0.000250 * 0.45 = 0.0001125
+    # corrected SE = sqrt(0.0001125) = 0.0106066
+    # corrected t-stat = 0.0200 / 0.0106066 = 1.8856... => round to 1.886
+    from scipy import stats
+
+    diffs = np.array([0.01, 0.02, 0.00, 0.03, 0.04])
+    res = compute_nadeau_bengio_corrected_ttest(diffs, n_train=800, n_test=200)
+
+    assert res["mean_difference"] == 0.0200
+    assert res["sample_variance"] == 0.000250
+    assert res["sample_size_ratio"] == 0.2500
+    assert res["correction_factor"] == 0.4500
+    assert res["degrees_of_freedom"] == 4
+    assert res["corrected_t_stat"] == 1.886
+
+    expected_p = float(2.0 * stats.t.sf(np.abs(0.0200 / np.sqrt(0.0001125)), df=4))
+    assert round(res["two_sided_p_value"], 4) == round(expected_p, 4)
+
+
+def test_nadeau_bengio_corrected_ttest_input_validation():
+    """Verify that fewer than 2 evaluations raises ValueError."""
+    with pytest.raises(ValueError, match="At least 2 paired evaluations are required"):
+        compute_nadeau_bengio_corrected_ttest(np.array([0.05]), n_train=100, n_test=25)
 
 
 def test_cv_statistical_significance_calculator(train_val_fixture):

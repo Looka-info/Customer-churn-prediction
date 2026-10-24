@@ -186,6 +186,161 @@ def cross_validate_candidates(
     return cv_df, oof_predictions
 
 
+def compute_nadeau_bengio_corrected_ttest(
+    diffs: np.ndarray,
+    n_train: int,
+    n_test: int,
+) -> Dict[str, float]:
+    """
+    Calculate the Nadeau–Bengio corrected resampled t-test for paired cross-validation evaluations.
+
+    THEORETICAL FOUNDATION (Nadeau & Bengio 2003; Bouckaert & Frank 2004):
+        In k-fold cross-validation and repeated k-fold cross-validation, training sets across
+        folds overlap significantly ((k-1)/k overlap = 80% in 5-fold CV). This violates the
+        fundamental independence assumption of standard paired t-tests, underestimating variance
+        and inflating Type I error rates (Dietterich 1998).
+
+        Nadeau & Bengio (2003) derived the corrected variance of the mean difference d_bar:
+            sigma^2_corrected = s^2 * (1 / R + n_test / n_train)
+
+    VARIABLE DEFINITIONS:
+        - N: Total sample size of the training dataset partition (e.g., N = 5,634).
+        - K: Number of folds per cross-validation repeat (e.g., K = 5).
+        - J: Number of repeats (e.g., J = 3).
+        - R: Total number of paired resamples/evaluations (R = J * K = 15).
+        - n_train: Number of training examples per fold (n_train = N * (K - 1) / K = 4,507).
+        - n_test: Number of validation examples per fold (n_test = N / K = 1,127).
+        - Sample-size ratio: n_test / n_train = 1 / (K - 1) = 0.25 for 5-fold CV.
+        - s^2: Unbiased sample variance of the R paired score differences:
+               s^2 = [1 / (R - 1)] * sum((d_r - d_bar)^2)
+        - Corrected standard error: SE_corrected = sqrt(s^2 * (1 / R + n_test / n_train)).
+        - Corrected t-statistic: t = d_bar / SE_corrected.
+        - Degrees of freedom: df = R - 1 (df = 14 for R = 15).
+        - p-value: Two-sided p-value from Student's t-distribution with df = R - 1:
+                   p = 2 * P(T >= |t|).
+
+    SCIENTIFIC QUALIFICATION:
+        A non-significant p-value (p > 0.05) indicates that observed mean differences (+0.0035 to +0.0044)
+        do not exceed resampling variability (+/- 0.020). It does NOT prove statistical equivalence
+        between models in the general population (absence of evidence is not proof of equivalence).
+    """
+    from scipy import stats
+
+    diffs_arr = np.asarray(diffs, dtype=float)
+    R = len(diffs_arr)
+    if R < 2:
+        raise ValueError("At least 2 paired evaluations are required to calculate variance.")
+
+    d_bar = float(np.mean(diffs_arr))
+    s2 = float(np.var(diffs_arr, ddof=1))
+
+    sample_size_ratio = float(n_test) / float(n_train)
+    correction_factor = (1.0 / float(R)) + sample_size_ratio
+    corrected_var = s2 * correction_factor
+    corrected_se = float(np.sqrt(corrected_var))
+
+    if corrected_se == 0.0:
+        t_stat = 0.0
+        p_val = 1.0
+    else:
+        t_stat = float(d_bar / corrected_se)
+        df = R - 1
+        p_val = float(2.0 * stats.t.sf(np.abs(t_stat), df=df))
+
+    return {
+        "mean_difference": round(d_bar, 4),
+        "sample_variance": round(s2, 6),
+        "sample_size_ratio": round(sample_size_ratio, 4),
+        "correction_factor": round(correction_factor, 4),
+        "corrected_se": round(corrected_se, 4),
+        "corrected_t_stat": round(t_stat, 3),
+        "degrees_of_freedom": int(R - 1),
+        "two_sided_p_value": round(p_val, 4),
+        "statistically_significant_05": bool(p_val < 0.05),
+    }
+
+
+def run_repeated_cv_comparison(
+    X_train: pd.DataFrame,
+    y_train: pd.Series,
+    n_splits: int = 5,
+    n_repeats: int = 3,
+    random_state: int = 42,
+    config: Optional[AppConfig] = None,
+) -> pd.DataFrame:
+    """
+    Execute 3-repeated 5-fold cross-validation (R=15 paired evaluations) across all candidate
+    models and compute the Nadeau–Bengio corrected resampled t-test against Logistic Regression.
+    """
+    from sklearn.model_selection import RepeatedStratifiedKFold
+
+    cfg = config or get_config()
+    num_cols, cat_cols = get_feature_lists(X_train, cfg)
+    candidates = create_candidate_models(cfg)
+
+    rskf = RepeatedStratifiedKFold(
+        n_splits=n_splits, n_repeats=n_repeats, random_state=random_state
+    )
+
+    scores: Dict[str, List[float]] = {name: [] for name in candidates}
+    last_train_len = len(X_train)
+    last_test_len = 0
+
+    for train_idx, val_idx in rskf.split(X_train, y_train):
+        X_tr, X_val = X_train.iloc[train_idx], X_train.iloc[val_idx]
+        y_tr, y_val = y_train.iloc[train_idx], y_train.iloc[val_idx]
+        last_train_len = len(train_idx)
+        last_test_len = len(val_idx)
+
+        for name, est in candidates.items():
+            pipe = build_model_pipeline(est, num_cols, cat_cols, scale_numeric=True)
+            pipe.fit(X_tr, y_tr)
+            probs = pipe.predict_proba(X_val)[:, 1]
+            scores[name].append(float(average_precision_score(y_val, probs)))
+
+    baseline_name = "Logistic Regression"
+    base_scores = np.array(scores[baseline_name])
+    rows = []
+
+    for name, s_list in scores.items():
+        s_arr = np.array(s_list)
+        mean_score = float(np.mean(s_arr))
+        std_score = float(np.std(s_arr))
+
+        if name == baseline_name:
+            rows.append(
+                {
+                    "Candidate_Model": name,
+                    "Repeated_CV_PR_AUC_Mean": round(mean_score, 4),
+                    "Repeated_CV_PR_AUC_Std": round(std_score, 4),
+                    "Mean_Difference": 0.0,
+                    "Corrected_t_stat": 0.0,
+                    "Degrees_of_Freedom": int(len(s_arr) - 1),
+                    "Nadeau_Bengio_p_value": 1.0,
+                    "Exceeds_Variance (p < 0.05)": False,
+                }
+            )
+        else:
+            diffs = s_arr - base_scores
+            nb_res = compute_nadeau_bengio_corrected_ttest(
+                diffs, n_train=last_train_len, n_test=last_test_len
+            )
+            rows.append(
+                {
+                    "Candidate_Model": name,
+                    "Repeated_CV_PR_AUC_Mean": round(mean_score, 4),
+                    "Repeated_CV_PR_AUC_Std": round(std_score, 4),
+                    "Mean_Difference": nb_res["mean_difference"],
+                    "Corrected_t_stat": nb_res["corrected_t_stat"],
+                    "Degrees_of_Freedom": nb_res["degrees_of_freedom"],
+                    "Nadeau_Bengio_p_value": nb_res["two_sided_p_value"],
+                    "Exceeds_Variance (p < 0.05)": nb_res["statistically_significant_05"],
+                }
+            )
+
+    return pd.DataFrame(rows)
+
+
 def compute_cv_statistical_significance(
     oof_predictions: Dict[str, Dict[str, Any]],
     baseline_model: str = "Logistic Regression",
