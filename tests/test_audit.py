@@ -76,18 +76,36 @@ def test_threshold_tuning_uses_only_training_data(train_val_fixture):
     df_thresh = analyze_threshold_tradeoffs(y_true, probs_rf)
 
     assert "threshold" in df_thresh.columns
-    assert "net_business_value" in df_thresh.columns
+    assert "hypothetical_expected_value" in df_thresh.columns
+    assert "churners_identified_tp" in df_thresh.columns
     assert len(df_thresh) >= 5
 
-    # Check utility monotonicity or expected structure
-    assert df_thresh["true_positives"].iloc[0] >= df_thresh["true_positives"].iloc[-1]
-    assert df_thresh["false_positives"].iloc[0] >= df_thresh["false_positives"].iloc[-1]
+    # Check that identified churners decrease as threshold increases
+    assert df_thresh["churners_identified_tp"].iloc[0] >= df_thresh["churners_identified_tp"].iloc[-1]
+    assert df_thresh["false_alarms_fp"].iloc[0] >= df_thresh["false_alarms_fp"].iloc[-1]
+
+
+def test_intervention_sensitivity_analysis(train_val_fixture):
+    """
+    Audit Check: Verify multi-scenario sensitivity analysis computes expected value
+    across conservative, moderate, and optimistic retention success rates.
+    """
+    from churn_prediction.evaluate import run_intervention_sensitivity_analysis
+
+    _, _, y_true, probs_rf = train_val_fixture
+    sens_df = run_intervention_sensitivity_analysis(y_true, probs_rf)
+
+    assert len(sens_df) == 9  # 3 scenarios * 3 thresholds
+    assert "scenario" in sens_df.columns
+    assert "success_rate_eta" in sens_df.columns
+    assert "net_expected_value" in sens_df.columns
+    assert set(sens_df["scenario"].unique()) == {"Conservative", "Moderate", "Optimistic"}
 
 
 def test_cv_statistical_significance_calculator(train_val_fixture):
     """
-    Audit Check: Verify paired t-test correctly identifies whether fold score
-    differences between candidate models are statistically distinguishable.
+    Audit Check: Verify exploratory paired t-test correctly calculates fold differences
+    and reports exploratory p-values without assuming null hypothesis proof.
     """
     _, oof_preds, _, _ = train_val_fixture
     sig_df = compute_cv_statistical_significance(
@@ -96,8 +114,8 @@ def test_cv_statistical_significance_calculator(train_val_fixture):
 
     assert len(sig_df) == 2
     assert "Paired_t_stat" in sig_df.columns
-    assert "p_value" in sig_df.columns
-    for p in sig_df["p_value"]:
+    assert "p_value_exploratory" in sig_df.columns
+    for p in sig_df["p_value_exploratory"]:
         assert 0.0 <= p <= 1.0
 
 
@@ -115,8 +133,8 @@ def test_defensible_model_selection_parsimony_strategy(train_val_fixture):
 
 def test_defensible_model_selection_tradeoff_strategy(train_val_fixture):
     """
-    Audit Check: Under 'defensible_tradeoff', when models are statistically tied,
-    the decision rationale must explicitly record the statistical tie.
+    Audit Check: Under 'defensible_tradeoff', when discrimination differences
+    are smaller than fold std, the decision rationale records the trade-off.
     """
     cv_df, oof_preds, _, _ = train_val_fixture
     best_model, rationale = select_best_model(
@@ -125,7 +143,7 @@ def test_defensible_model_selection_tradeoff_strategy(train_val_fixture):
 
     assert best_model in ["Random Forest", "Logistic Regression"]
     assert "reason" in rationale
-    assert "is_statistically_tied" in rationale
+    assert "exploratory_paired_t_p_value" in rationale
 
 
 def test_average_precision_metric_properties():

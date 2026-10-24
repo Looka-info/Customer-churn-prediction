@@ -157,23 +157,41 @@ def run_pipeline() -> None:
     logger.info("Selected Model: %s", best_model_name)
     logger.info("Selection Rationale: %s", selection_audit["reason"])
 
+    # Controlled Feature Ablation Study: With vs Without TotalCharges (Training Data Only)
+    from churn_prediction.train import run_feature_ablation_study
+    ablation_df = run_feature_ablation_study(X_train, y_train, feature_to_drop="TotalCharges", config=config)
+    print("\n" + "=" * 80)
+    print("CONTROLLED FEATURE ABLATION (TRAINING 5-FOLD CV: WITH vs WITHOUT TotalCharges)")
+    print("=" * 80)
+    print(ablation_df.to_string(index=False))
+    print("=" * 80 + "\n")
+
     # Threshold analysis on training out-of-fold predictions
     best_oof = oof_preds[best_model_name]
     threshold_analysis = analyze_threshold_tradeoffs(
         best_oof["y_true"], best_oof["oof_probabilities"]
     )
-    print("\n" + "=" * 80)
-    print("TRAINING-SIDE OUT-OF-FOLD THRESHOLD & BUSINESS UTILITY TRADE-OFFS")
-    print("=" * 80)
+    print("=" * 85)
+    print("TRAINING OUT-OF-FOLD THRESHOLD TRADE-OFFS & HYPOTHETICAL EXPECTED VALUE")
+    print("=" * 85)
     print(threshold_analysis.to_string(index=False))
-    print("=" * 80)
+    print("=" * 85)
 
-    best_thresh_idx = threshold_analysis["net_business_value"].idxmax()
+    # Multi-Scenario Intervention Sensitivity Analysis
+    from churn_prediction.evaluate import run_intervention_sensitivity_analysis
+    sensitivity_df = run_intervention_sensitivity_analysis(best_oof["y_true"], best_oof["oof_probabilities"])
+    print("\n" + "=" * 95)
+    print("HYPOTHETICAL RETENTION INTERVENTION SENSITIVITY ANALYSIS (Varying Success Rate eta & Outreach Cost)")
+    print("=" * 95)
+    print(sensitivity_df.to_string(index=False))
+    print("=" * 95 + "\n")
+
+    best_thresh_idx = threshold_analysis["hypothetical_expected_value"].idxmax()
     optimal_thresh = float(threshold_analysis.loc[best_thresh_idx, "threshold"])
     logger.info(
-        "Training-side optimal economic threshold: %.2f (Net Value: $%,.2f, Recall: %.1f%%, Precision: %.1f%%)",
+        "Training-side optimal expected-value threshold: %.2f (Hypothetical Expected Value: $%,.2f, Recall: %.1f%%, Precision: %.1f%%)",
         optimal_thresh,
-        threshold_analysis.loc[best_thresh_idx, "net_business_value"],
+        threshold_analysis.loc[best_thresh_idx, "hypothetical_expected_value"],
         threshold_analysis.loc[best_thresh_idx, "recall"] * 100,
         threshold_analysis.loc[best_thresh_idx, "precision"] * 100,
     )

@@ -3,81 +3,60 @@
 [![Python Version](https://img.shields.io/badge/python-3.11%20%7C%203.12-blue.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Code Style](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
-[![Tests: Pytest](https://img.shields.io/badge/tests-23%20passed-brightgreen.svg)](https://docs.pytest.org/)
+[![Tests: Pytest](https://img.shields.io/badge/tests-24%20passed-brightgreen.svg)](https://docs.pytest.org/)
 
-An audited, reproducible, production-grade Machine Learning system designed to predict customer attrition for subscription telecommunications providers. Built with strict **data-leakage prevention**, modular architecture, cross-validation uncertainty audits, SQL data validation, cost-benefit threshold calibration, model interpretability, and automated testing.
+An audited, scientifically qualified Machine Learning benchmark designed to classify customer attrition risk on the public IBM Telco dataset. Built with defensive **data-leakage prevention**, modular architecture, cross-validation uncertainty audits, feature ablation studies, SQL invariant verification, and extensive automated testing.
 
 ---
 
 ## 📑 Table of Contents
-1. [Business Problem & Operational Value](#-business-problem--operational-value)
-2. [Project Objectives & Scope](#-project-objectives--scope)
-3. [Real-World Prediction Assumptions & Limitations](#-real-world-prediction-assumptions--limitations)
-4. [Dataset Governance & Licensing](#-dataset-governance--licensing)
-5. [Technology Stack](#-technology-stack)
-6. [Repository Architecture & Artifact Boundaries](#-repository-architecture--artifact-boundaries)
-7. [Data Hygiene & Exploratory Analysis](#-data-hygiene--exploratory-analysis)
-8. [SQL Analytics & Invariant Verification](#-sql-analytics--invariant-verification)
-9. [Data Preparation & Leakage Prevention](#-data-preparation--leakage-prevention)
+1. [Business Problem & Scope of Retrospective Classification](#-business-problem--scope-of-retrospective-classification)
+2. [Scientific Validity & Prediction-Horizon Audit](#-scientific-validity--prediction-horizon-audit)
+3. [Dataset Governance & Licensing](#-dataset-governance--licensing)
+4. [Technology Stack](#-technology-stack)
+5. [Repository Architecture & Artifact Boundaries](#-repository-architecture--artifact-boundaries)
+6. [Data Hygiene & Exploratory Analysis](#-data-hygiene--exploratory-analysis)
+7. [SQL Analytics & Invariant Verification](#-sql-analytics--invariant-verification)
+8. [Data Preparation & Leakage Prevention](#-data-preparation--leakage-prevention)
+9. [Feature Collinearity & Controlled Ablation Study](#-feature-collinearity--controlled-ablation-study)
 10. [Model Training, Uncertainty Audit & Defensible Selection](#-model-training-uncertainty-audit--defensible-selection)
 11. [Empirical Model Comparison & Metrics](#-empirical-model-comparison--metrics)
-12. [Cost-Benefit Threshold Calibration](#-cost-benefit-threshold-calibration)
+12. [Hypothetical Business Utility & Sensitivity Analysis](#-hypothetical-business-utility--sensitivity-analysis)
 13. [Model Interpretability & Error Analysis](#-model-interpretability--error-analysis)
 14. [Inference Service & Usage Example](#-inference-service--usage-example)
-15. [Responsible AI & Sensitive Attributes Safeguards](#-responsible-ai--sensitive-attributes-safeguards)
+15. [Responsible AI & Demographic Safeguards](#-responsible-ai--demographic-safeguards)
 16. [Installation & Reproduction Guide](#-installation--reproduction-guide)
-17. [Automated Testing](#-automated-testing)
-18. [Future Improvements](#-future-improvements)
+17. [Automated Testing Suite](#-automated-testing-suite)
+18. [Verified Implementation vs. Unverified Deployment Work](#-verified-implementation-vs-unverified-deployment-work)
 
 ---
 
-## 💼 Business Problem & Operational Value
+## 💼 Business Problem & Scope of Retrospective Classification
 
-In subscription telecommunications, acquiring a new subscriber costs **5× to 7× more** than retaining an existing customer. Unplanned subscriber turnover directly erodes recurring monthly revenue (MRR) and customer lifetime value (LTV).
+In subscription telecommunications, acquiring a new subscriber is typically **5× to 7× costlier** than retaining an existing customer. Identifying subscribers exhibiting patterns associated with churn allows customer success teams to prioritize account reviews and loyalty interventions.
 
-However, customer retention budgets are finite. A telecommunications operator cannot offer expensive rate discounts or concierge onboarding to every customer. Conversely, sending indiscriminate retention promotions to satisfied, low-risk customers wastes marketing budget and can inadvertently prompt contract reconsiderations.
-
-### Core Business Questions Addressed
-* **Risk Prioritization**: Which subscribers are at highest risk of canceling their service in the near term?
-* **Behavioral Associations**: What service configurations, tenure milestones, and billing methods are most strongly correlated with customer departure?
-* **Intervention Trade-offs**: How should retention teams balance False Positives (spending retention capital on a customer who would have stayed anyway) against False Negatives (missing a churning customer, incurring revenue loss)?
-* **Actionable Retention**: How can probabilistic risk estimates be translated into tiered operational playbooks?
-
-> **Operational Principle**: This model estimates **statistical churn risk**; it does not claim to establish metaphysical causation for an individual customer's decision. Predictions serve to guide triage and human-reviewed customer success workflows.
+### Scope of This Work
+* **Task**: Retrospective binary classification on the static IBM Telco customer churn dataset.
+* **Target Variable**: `Churn` (`1` = Customer churned, `0` = Customer retained).
+* **Guiding Principle**: The model estimates **statistical correlation and risk ranking** on observed customer profiles. It does not establish causal reasons for customer departures and does not guarantee that flagged customers can be successfully retained.
 
 ---
 
-## 🎯 Project Objectives & Scope
+## ⏱ Scientific Validity & Prediction-Horizon Audit
 
-| Area | Scope / Deliverable |
-| :--- | :--- |
-| **Problem Type** | Binary Classification (Supervised Learning) |
-| **Target Variable** | `Churn`: `1` = Customer churned, `0` = Customer retained |
-| **Baseline Model** | Logistic Regression with standardized numeric features and one-hot encoded categoricals |
-| **Candidate Models** | Random Forest Classifier, Gradient Boosting Classifier |
-| **Validation Strategy** | Stratified 5-Fold Cross-Validation on training data; held-out test set evaluated exactly once |
-| **Primary Metric** | **PR-AUC (Average Precision)** via `sklearn.metrics.average_precision_score` |
-| **Decision Threshold** | Calibrated on training-side out-of-fold validation predictions using an economic utility model |
-| **Persistence** | Complete `Pipeline` (preprocessing + estimator) serialized via `joblib` |
-| **Verification** | Pytest automated test suite (23 passing tests) covering schema, hygiene, leakage, and inference |
+A rigorous scientific review requires auditing the temporal assumptions embedded in machine learning workflows:
 
----
-
-## ⏱ Real-World Prediction Assumptions & Limitations
-
-A critical audit requirement for production machine learning systems is articulating when predictions occur, what data is legitimately available, and the structural limitations of the dataset:
-
-### 1. Intended Prediction Point & Horizon
-* **Prediction Point ($T$)**: The model is intended to execute at the close of a subscriber's monthly billing cycle (or 30–60 days prior to contract expiration).
-* **Prediction Horizon ($T + 30\text{ days}$)**: The target represents whether the subscriber will terminate service during the subsequent 30-day billing cycle.
-
-### 2. Available vs. Proxy Features (`TotalCharges` Analysis)
-* In our audit of the 7,043 customer records, `TotalCharges` exhibits a **0.99956 correlation** with the mathematical product of `tenure * MonthlyCharges` (mean absolute difference = $45.02 across up to 72 months of service).
-* **Multicollinearity & Suppressor Effects**: In linear models (Logistic Regression), including `tenure`, `MonthlyCharges`, and `TotalCharges` simultaneously causes severe multicollinearity. Specifically, `MonthlyCharges` takes on a negative coefficient (-0.599) in the presence of `TotalCharges` and `tenure`, despite having a positive univariate correlation (+0.193) with churn. When `tenure` and `TotalCharges` are held constant, a higher `MonthlyCharges` mathematically implies shorter tenure or a recent plan change. Tree-based models (Random Forest, Gradient Boosting) are naturally resilient to this collinearity because split points evaluate features independently.
-
-### 3. Cross-Sectional vs. Prospective Generalization
-* The IBM Telco dataset is a **retrospective cross-sectional snapshot**. All tenure cohorts (from month 1 to month 72) are observed simultaneously.
-* **Limitation**: A random stratified train/test split evaluates *cross-sectional* generalization across customers, but **not prospective temporal generalization** across calendar time. In an enterprise production setting, a model trained on data up to Month $T$ must predict on Month $T+1$ through $T+6$. If competitor campaigns, seasonal patterns, or macroeconomic conditions change, performance may degrade. A production deployment requires rolling-window temporal validation and drift monitoring.
+### 1. Retrospective Classification Nature (Absence of Forward-Looking Horizon)
+* **Dataset Reality**: Inspection of the IBM Telco Customer Churn schema confirms that the dataset contains **zero timestamps** (no account creation timestamp, no billing cycle dates, no churn timestamp, and no temporal snapshot logs).
+* **Scientific Scope**: This project is strictly a **retrospective binary classification benchmark** evaluating the static relationship between historical subscriber profile attributes and the supplied `Churn` target label.
+* **Non-Prospective Character**: It is methodologically invalid to claim that this model predicts churn over a forward-looking 30-day (or 60-day) horizon. The dataset provides no evidence of a defined observation window or prospective outcome window.
+* **Requirements for Genuine Prospective Churn Forecasting**:
+  To build and evaluate a genuine prospective churn prediction model in production, an enterprise requires:
+  1. **Longitudinal Event Timestamps**: Event streams with explicit event dates ($t_{\text{login}}$, $t_{\text{ticket}}$, $t_{\text{payment}}$, $t_{\text{disconnect}}$).
+  2. **Observation Window ($[T_0, T_{\text{obs}}]$)**: A defined historical period (e.g., 90 days) during which predictor features (e.g. usage decay, billing changes, support tickets) are aggregated.
+  3. **Buffer / Action Window ($[T_{\text{obs}}, T_{\text{target\_start}}]$)**: A mandatory gap (e.g., 7–14 days) allowing customer success teams to run an intervention before the churn evaluation window starts.
+  4. **Prospective Outcome Window ($[T_{\text{target\_start}}, T_{\text{target\_end}}]$)**: A forward-looking period (e.g., next 30 or 60 days) where churn is formally recorded.
+  5. **Out-of-Time Temporal Splitting**: Models must be trained on events prior to time $T$ and evaluated on subsequent events after $T$ to measure degradation under concept drift and macroeconomic shocks.
 
 ---
 
@@ -94,7 +73,7 @@ A critical audit requirement for production machine learning systems is articula
   * Churned (`Yes`): 1,869 accounts (26.54%).
 * **Data Hygiene Invariant**:
   * Exactly 11 accounts have blank whitespace (`" "`) in `TotalCharges`.
-  * Every one of these 11 accounts has `tenure == 0` (brand-new accounts registered in the current cycle that have not yet generated a billing invoice).
+  * Every one of these 11 accounts has `tenure == 0` (brand-new accounts registered in the current cycle that have not yet generated a billing invoice; none churned).
   * **Hygiene Rule**: Impute `TotalCharges = 0.0` for `tenure == 0`, and maintain median imputation in the preprocessing pipeline for unseen inference data.
 
 ---
@@ -103,7 +82,7 @@ A critical audit requirement for production machine learning systems is articula
 
 * **Language**: Python 3.11 / 3.12
 * **Data Processing**: `pandas` (>= 2.2), `numpy` (>= 2.0)
-* **Statistical Auditing**: `scipy.stats` (paired t-tests across cross-validation folds)
+* **Statistical Auditing**: `scipy.stats` (paired t-tests across cross-validation folds, Nadeau-Bengio corrected tests)
 * **Machine Learning**: `scikit-learn` (>= 1.5) (`Pipeline`, `ColumnTransformer`, `LogisticRegression`, `RandomForestClassifier`, `GradientBoostingClassifier`)
 * **Storage & Relational Analytics**: SQLite3 and ANSI SQL
 * **Visualization**: `matplotlib` (>= 3.9), `seaborn` (>= 0.13)
@@ -139,8 +118,8 @@ customer-churn-prediction/
 │       ├── data_loader.py              # Ingestion, schema verification, and hygiene
 │       ├── database.py                 # SQLite ingestion and SQL-vs-Pandas verification
 │       ├── preprocessing.py            # Leakage-free ColumnTransformer & data splitting
-│       ├── train.py                    # Stratified 5-Fold CV, paired t-tests, defensible selection
-│       ├── evaluate.py                 # Metrics, economic utility threshold tuning, curves
+│       ├── train.py                    # Stratified 5-Fold CV, paired t-tests, ablation, selection
+│       ├── evaluate.py                 # Metrics, sensitivity analysis, diagnostic curves
 │       ├── interpret.py                # Tree importances, odds ratios, error analysis
 │       ├── eda.py                      # Batch generation of report-ready figures
 │       └── predict.py                  # Production inference class with input validation
@@ -167,7 +146,7 @@ customer-churn-prediction/
 │   ├── test_preprocessing.py           # Unseen category safety, ColumnTransformer checks
 │   ├── test_training.py                # Pipeline fit/predict, cross-validation sanity
 │   ├── test_prediction.py              # Schema validation, probability range, save/load
-│   └── test_audit.py                   # Audit checks: leakage, statistical tests, threshold utility
+│   └── test_audit.py                   # Audit checks: leakage, statistical tests, sensitivity
 └── scripts/
     ├── download_data.py                # Downloads and verifies raw dataset
     ├── create_notebook.py              # Generates the EDA notebook
@@ -186,7 +165,7 @@ The baseline churn prevalence is **26.54%** (1,869 churners vs. 5,174 retained).
 ![Target Distribution](reports/figures/target_distribution.png)
 
 ### 2. Numerical Features by Churn Status
-* **Tenure**: The single most decisive duration feature. Accounts in months 0–12 exhibit churn rates exceeding 45%, while accounts with tenure > 48 months drop below 10%.
+* **Tenure**: Strongest duration feature. Accounts in months 0–12 exhibit churn rates exceeding 45%, while accounts with tenure > 48 months drop below 10%.
 * **Monthly Charges**: Concentrated at higher tiers for churned subscribers ($70–$100/month), predominantly driven by Fiber Optic service.
 * **Total Charges**: Skewed lower for churners due to premature departure.
 
@@ -211,12 +190,9 @@ The baseline churn prevalence is **26.54%** (1,869 churners vs. 5,174 retained).
 
 ## 🗄 SQL Analytics & Invariant Verification
 
-To mirror enterprise workflows where analysts query data warehouses, the validated dataset is loaded into a local SQLite database (`data/churn_analysis.db`).
-
-The pipeline executes automated invariant checks (`src/churn_prediction/database.py:verify_sql_against_pandas`) ensuring that SQL aggregations and Pandas calculations agree to within floating-point tolerance (0.01%):
+The validated dataset is ingested into a local SQLite database (`data/churn_analysis.db`). The pipeline verifies that SQL database aggregations and Pandas calculations agree to within 0.01%:
 
 ```sql
--- Churn Rate by Contract Type & Internet Service
 SELECT
     contract,
     internet_service,
@@ -235,62 +211,82 @@ ORDER BY churn_rate_percent DESC;
 
 ## 🛡 Data Preparation & Leakage Prevention
 
-Defensive engineering rules enforce total separation between training data and held-out evaluation:
-
-1. **Isolation Prior to Preprocessing**:
-   * Stratified 80/20 train/test split performed **first** (`random_state=42`).
-   * Training set: 5,634 samples. Held-out test set: 1,409 samples.
-   * Both partitions retain an identical 26.54% churn prevalence.
-2. **ColumnTransformer Encapsulation**:
-   * **Numeric Pipeline**: `SimpleImputer(strategy='median')` followed by `StandardScaler()`. Imputer medians and scaling parameters ($\mu, \sigma$) are computed **only** on training folds.
-   * **Categorical Pipeline**: `SimpleImputer(strategy='most_frequent')` followed by `OneHotEncoder(handle_unknown='ignore', drop='if_binary', sparse_output=False)`.
-3. **Unseen Categories Resilience**:
-   * Previously unseen categorical values at inference time are safely encoded as zeros without throwing runtime errors.
-4. **Identifier Isolation**:
-   * `customerID` is excluded from all model feature matrices.
-5. **Threshold Tuning Hygiene**:
-   * Decision threshold calibration is conducted strictly on **training out-of-fold validation predictions**, never on the held-out test set.
+Defensive engineering rules enforce strict separation:
+1. **Isolation Prior to Preprocessing**: Stratified 80/20 train/test split performed **first** (`random_state=42`). Training set: 5,634 samples. Held-out test set: 1,409 samples.
+2. **ColumnTransformer Encapsulation**: Imputers and scalers compute parameters strictly on training folds.
+3. **Unseen Categories Resilience**: Categorical encoder uses `handle_unknown='ignore'`.
+4. **Identifier Isolation**: `customerID` is excluded from all feature matrices.
+5. **Threshold Tuning Isolation**: Decision threshold analysis is conducted strictly on **training out-of-fold validation predictions**.
 
 ---
 
-## 🔬 Model Training, Uncertainty Audit & Defensible Selection
+## 🔬 Feature Collinearity & Controlled Ablation Study
 
-Three distinct classifiers were evaluated on the training set using identical **Stratified 5-Fold Cross-Validation** splits (`random_state=42`):
-1. **Model A: Logistic Regression** — Baseline with L2 regularization ($C=1.0$).
-2. **Model B: Random Forest Classifier** — Tree ensemble (`n_estimators=150`, `max_depth=8`, `min_samples_leaf=2`).
-3. **Model C: Gradient Boosting Classifier** — Boosted trees (`n_estimators=100`, `learning_rate=0.08`, `max_depth=4`, `subsample=0.85`).
+### 1. Empirical Collinearity Relationships
+* `TotalCharges` exhibits an empirical correlation of **0.99956** with `tenure * MonthlyCharges`.
+* Correlation of `TotalCharges` with `tenure`: **0.8258**.
+* Correlation of `TotalCharges` with `MonthlyCharges`: **0.6511**.
+
+### 2. Logistic Regression Coefficient Stability Across 5 CV Folds
+We inspected the mean and standard deviation of standardized logistic regression coefficients across the 5 cross-validation training folds:
+* **With `TotalCharges`**:
+  * `tenure`: $\beta = -1.2440 \pm 0.0655$
+  * `MonthlyCharges`: $\beta = -0.4916 \pm 0.1134$
+  * `TotalCharges`: $\beta = +0.5189 \pm 0.0693$
+* **Without `TotalCharges`**:
+  * `tenure`: $\beta = -0.8021 \pm 0.0355$
+  * `MonthlyCharges`: $\beta = -0.3910 \pm 0.1188$
+
+> **Finding**: Including `TotalCharges` causes `MonthlyCharges` to display an apparent negative coefficient ($\beta = -0.49$) despite its positive marginal correlation with churn (+0.193). This is an algebraic suppressor effect: controlling for total lifetime charges and tenure, higher monthly spend mathematically implies shorter tenure or recent plan changes.
+
+### 3. Tree Models and Correlated Features
+* Tree ensembles are **not** immune to correlated predictors. While collinearity does not cause numerical matrix singularities in decision trees, highly correlated features compete for splits. This leads to **split masking**, **dilution of Mean Decrease Impurity (MDI) importance**, and tree structure instability across bootstrap resamples.
+
+### 4. Controlled Feature Ablation (Training 5-Fold Cross-Validation)
+We ran a controlled ablation study strictly on training data comparing performance with and without `TotalCharges`:
+
+| Specification | Model | CV PR-AUC (Mean ± Std) | CV ROC-AUC (Mean ± Std) |
+| :--- | :--- | :---: | :---: |
+| **Baseline (With TotalCharges)** | Logistic Regression | 0.6615 ± 0.0195 | 0.8462 ± 0.0126 |
+| **Baseline (With TotalCharges)** | Random Forest | 0.6650 ± 0.0203 | 0.8475 ± 0.0094 |
+| **Baseline (With TotalCharges)** | Gradient Boosting | 0.6643 ± 0.0189 | 0.8482 ± 0.0111 |
+| **Ablated (Without TotalCharges)** | Logistic Regression | 0.6597 ± 0.0188 | 0.8449 ± 0.0122 |
+| **Ablated (Without TotalCharges)** | Random Forest | 0.6566 ± 0.0194 | 0.8443 ± 0.0092 |
+| **Ablated (Without TotalCharges)** | Gradient Boosting | 0.6647 ± 0.0180 | 0.8465 ± 0.0099 |
+
+* **Observation**: Omitting `TotalCharges` causes a minor drop in Random Forest CV PR-AUC (-0.0084), while Gradient Boosting remains essentially unchanged (+0.0004) and Logistic Regression drops marginally (-0.0018). All changes are smaller than 1 cross-validation standard deviation ($\sim 0.019$).
+
+---
+
+## 📈 Model Training, Uncertainty Audit & Defensible Selection
 
 ### 1. Primary Selection Metric Definition: PR-AUC (Average Precision)
-In an imbalanced classification problem (26.5% positive rate), overall Accuracy is uninformative. **PR-AUC (Average Precision)** is selected as the primary ranking metric. 
+PR-AUC is computed using `sklearn.metrics.average_precision_score`:
+$$\text{AP} = \sum_{n} (R_n - R_{n-1}) P_n$$
+This calculates the weighted mean of precisions at each threshold, avoiding trapezoidal overestimation.
 
-> **Methodological Note on Metric Calculation**:  
-> The PR-AUC reported here uses `sklearn.metrics.average_precision_score`:
-> $$\text{AP} = \sum_{n} (R_n - R_{n-1}) P_n$$
-> This computes the weighted mean of precisions at each threshold. This is preferred over trapezoidal numerical integration (`sklearn.metrics.auc(recall, precision)`), which is known to produce optimistic overestimates on non-monotonic precision-recall curves.
-
-### 2. Statistical Significance Audit Across CV Folds
-Rather than picking a model based on microscopic point differences, we conducted paired t-tests across the 5 cross-validation folds against the Logistic Regression baseline:
+### 2. Cross-Validation Statistical Uncertainty Audit
+We evaluated fold-level variability using both standard 5-fold CV paired $t$-tests and repeated cross-validation:
 
 ```text
-STATISTICAL SIGNIFICANCE vs LOGISTIC REGRESSION BASELINE (PR-AUC):
-    Candidate_Model      Baseline_Model  Mean_Difference  Paired_t_stat  p_value  Statistically Distinguishable (p < 0.05)
-Logistic Regression Logistic Regression           0.0000          0.000    1.000                                     False
-      Random Forest Logistic Regression          +0.0035          1.148    0.315                                     False
-  Gradient Boosting Logistic Regression          +0.0028          0.875    0.431                                     False
-
-STATISTICAL SIGNIFICANCE vs LOGISTIC REGRESSION BASELINE (ROC-AUC):
-    Candidate_Model      Baseline_Model  Mean_Difference  Paired_t_stat  p_value  Statistically Distinguishable (p < 0.05)
-Logistic Regression Logistic Regression           0.0000          0.000    1.000                                     False
-      Random Forest Logistic Regression          +0.0013          0.440    0.683                                     False
-  Gradient Boosting Logistic Regression          +0.0020          0.525    0.627                                     False
+EXPLORATORY PAIRED t-TESTS vs LOGISTIC REGRESSION BASELINE (5-Fold CV PR-AUC):
+    Candidate_Model      Baseline_Model  Mean_Difference  Paired_t_stat  p_value_exploratory  Exceeds_Fold_Variance (p < 0.05)
+Logistic Regression Logistic Regression           0.0000          0.000                1.000                             False
+      Random Forest Logistic Regression          +0.0035          1.148                0.315                             False
+  Gradient Boosting Logistic Regression          +0.0028          0.875                0.431                             False
 ```
 
+#### Defensible Repeated-CV Analysis (Nadeau-Bengio Corrected Resampled $t$-Test)
+Because standard paired $t$-tests on cross-validation folds violate the independence assumption (training folds overlap by 80%, underestimating variance and inflating Type I error rates), we evaluated a 3-repeated 5-fold CV (15 evaluations) with the **Nadeau-Bengio corrected resampled $t$-test**:
+* **Random Forest vs. Logistic Regression**: Mean Difference $= +0.0044$, Corrected $t = 0.955$, Corrected $p = 0.3559$.
+* **Gradient Boosting vs. Logistic Regression**: Mean Difference $= +0.0049$, Corrected $t = 0.815$, Corrected $p = 0.4287$.
+
+> **Scientific Interpretation**: A non-significant $p$-value ($p > 0.05$) does **NOT** prove that two models are equivalent in general population performance (absence of evidence is not evidence of absence). Rather, it demonstrates that within the sample variance of these evaluations, the observed mean difference of $+0.0035$ to $+0.0044$ is smaller than fold-to-fold resampling variability ($\pm 0.020$).
+
 ### 3. Defensible Model Selection Decision
-* **Finding**: The differences in discriminative power between Logistic Regression (0.6615), Gradient Boosting (0.6643), and Random Forest (0.6650) are **statistically indistinguishable** ($p > 0.30$, well within the standard deviation of $\pm 0.020$).
-* **Decision Rationale**:
-  * If the business priority is **Occam's razor / governance**: Logistic Regression is the most defensible choice. It offers closed-form log-odds interpretability, zero ensemble inference latency, and higher default recall (0.5445 vs 0.5137).
-  * If the business priority is **minimizing wasted retention budget**: Random Forest is selected because it delivers higher cross-validation precision (**0.6739 vs 0.6530**), reducing false-positive retention outreach in finite-budget customer success campaigns.
-  * In this repository, **Random Forest** is retained as the operational pipeline, and the statistical tie with Logistic Regression is transparently documented in the audit trail.
+* **Logistic Regression**: Most defensible under Occam's razor and regulatory transparency. Yields direct log-odds, runs with negligible latency, and achieves higher default recall ($0.5445$ vs $0.5137$) and F1 ($0.5932$ vs $0.5828$).
+* **Random Forest**: Selected when the operational retention objective is **minimizing false alarms** under a strict budget constraint, because it achieves higher cross-validation precision (**$67.39\%$ vs $65.30\%$**).
+* In this repository, **Random Forest** is retained, with the statistical tie and trade-off explicitly logged in the audit trail.
 
 ---
 
@@ -309,56 +305,64 @@ All metrics reflect actual execution (`reports/model_comparison.csv`):
 * **False Positives (FP)**: 92 accounts
 * **False Negatives (FN)**: 182 accounts
 * **True Positives (TP)**: 192 accounts
-* **Precision**: $\frac{192}{192 + 92} = 67.61\%$
-* **Recall**: $\frac{192}{192 + 182} = 51.34\%$
-* **F1-Score**: $58.36\%$
+* **Precision**: $67.61\%$ | **Recall**: $51.34\%$ | **F1**: $58.36\%$
 
 ![Confusion Matrix](reports/figures/confusion_matrix.png)
 ![PR & ROC Curves](reports/figures/pr_roc_curves.png)
 
 ---
 
-## 💰 Cost-Benefit Threshold Calibration
+## 💰 Hypothetical Business Utility & Sensitivity Analysis
 
-A standard classification threshold of $0.50$ is rarely optimal in business operations. We evaluated threshold trade-offs and net business utility **strictly on training out-of-fold predictions**:
+### 1. Scientific Qualification of Business Utility
+* The utility calculations below are **hypothetical expected-value scenarios** based on assumed unit parameters.
+* They do **NOT** represent demonstrated financial return on investment (ROI) or confirmed customer retention. Correctly identifying an at-risk subscriber (True Positive) does **not** prove that the subscriber can or will be persuaded to stay. In real operations, churners include non-persuadable departures (e.g., relocation outside service coverage, business closures).
 
-### Business Utility Model Assumptions
-* **Cost of False Positive ($C_{FP}$)**: $20 (cost of unnecessary retention offer or discount).
-* **Cost of False Negative ($C_{FN}$)**: $100 (lifetime gross margin lost when a churner is missed).
-* **Benefit of True Positive ($B_{TP}$)**: $80 (net lifetime margin preserved by successful retention outreach).
-* **Net Value**: $(\text{TP} \times \$80) - (\text{FP} \times \$20) - (\text{FN} \times \$100)$
+### 2. Assumed Scenario Parameter Values
+* Assumed False Positive Cost ($C_{FP}$): $20 (cost of unnecessary outreach or discount).
+* Assumed False Negative Cost ($C_{FN}$): $100 (lost customer lifetime gross margin).
+* Assumed True Positive Benefit ($B_{TP}$): $80 (net lifetime margin preserved under successful intervention).
 
 ```text
-TRAINING-SIDE OUT-OF-FOLD THRESHOLD & BUSINESS UTILITY TRADE-OFFS:
- threshold  precision  recall     f1  true_positives  false_positives  true_negatives  false_negatives  net_business_value
-      0.20     0.4619  0.8729 0.6042            1305             1520            2619              190           +$55,000.0
-      0.25     0.5028  0.8334 0.6272            1246             1232            2907              249           +$50,140.0
-      0.30     0.5335  0.7779 0.6329            1163             1017            3122              332           +$39,500.0
-      0.35     0.5649  0.7251 0.6350            1084              835            3304              411           +$28,920.0
-      0.40     0.6051  0.6528 0.6281             976              637            3502              519           +$13,440.0
-      0.45     0.6370  0.5846 0.6097             874              498            3641              621            -$2,140.0
-      0.50     0.6731  0.5137 0.5827             768              373            3766              727           -$18,720.0
-      0.60     0.7282  0.3244 0.4489             485              181            3958             1010           -$65,820.0
-      0.70     0.8338  0.1846 0.3023             276               55            4084             1219          -$100,920.0
+TRAINING OUT-OF-FOLD THRESHOLD TRADE-OFFS & HYPOTHETICAL EXPECTED VALUE:
+ threshold  precision  recall     f1  churners_identified_tp  false_alarms_fp  retained_correct_tn  missed_churners_fn  hypothetical_expected_value
+      0.20     0.4619  0.8729 0.6042                    1305             1520                 2619                 190                   +$55,000.0
+      0.25     0.5028  0.8334 0.6272                    1246             1232                 2907                 249                   +$50,140.0
+      0.30     0.5335  0.7779 0.6329                    1163             1017                 3122                 332                   +$39,500.0
+      0.35     0.5649  0.7251 0.6350                    1084              835                 3304                 411                   +$28,920.0
+      0.40     0.6051  0.6528 0.6281                     976              637                 3502                 519                   +$13,440.0
+      0.45     0.6370  0.5846 0.6097                     874              498                 3641                 621                    -$2,140.0
+      0.50     0.6731  0.5137 0.5827                     768              373                 3766                 727                   -$18,720.0
+      0.60     0.7282  0.3244 0.4489                     485              181                 3958                1010                   -$65,820.0
+      0.70     0.8338  0.1846 0.3023                     276               55                 4084                1219                  -$100,920.0
 ```
 
-### Operational Threshold Comparison on Held-Out Test Set
-Evaluating the training-calibrated threshold on the unseen test set demonstrates the real-world operational trade-off:
+### 3. Sensitivity Analysis Across Intervention Success Rates ($\eta$) and Costs
+To examine sensitivity to intervention effectiveness, we evaluated net expected value where only a fraction ($\eta$) of contacted churners are persuadable:
+$$\text{Net Value} = (\text{TP} \times \eta \times V) - (\text{TP} + \text{FP}) \times C_{\text{outreach}} - (\text{FN} \times V)$$
 
-| Operating Threshold | Precision | Recall | F1-Score | TP | FP | FN | TN | Operational Strategy |
-| :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :--- |
-| **0.50 (Default)** | **67.61%** | 51.34% | 58.36% | 192 | 92 | 182 | 943 | Conservative: Minimizes wasted retention offers; leaves 182 churners uncontacted. |
-| **0.35 (Calibrated)** | 54.79% | **71.93%** | **62.20%** | **269** | 222 | **105** | 813 | High Coverage: Captures 77 additional churners (+20.6% recall) while preserving 55% precision. |
+```text
+HYPOTHETICAL RETENTION INTERVENTION SENSITIVITY ANALYSIS (Training Out-Of-Fold Data):
+    scenario success_rate_eta unit_outreach_cost customer_value  threshold  churners_identified  hypothetical_persuaded  false_alarms  net_expected_value
+Conservative              15%                $25           $100       0.25                 1246                   186.9          1232            -$68,160.0
+Conservative              15%                $25           $100       0.35                 1084                   162.6           835            -$72,815.0
+Conservative              15%                $25           $100       0.50                  768                   115.2           373            -$89,705.0
+    Moderate              30%                $20           $120       0.25                 1246                   373.8          1232            -$34,584.0
+    Moderate              30%                $20           $120       0.35                 1084                   325.2           835            -$48,676.0
+    Moderate              30%                $20           $120       0.50                  768                   230.4           373            -$82,412.0
+  Optimistic              50%                $15           $150       0.25                 1246                   623.0          1232            +$18,930.0
+  Optimistic              50%                $15           $150       0.35                 1084                   542.0           835             -$9,135.0
+  Optimistic              50%                $15           $150       0.50                  768                   384.0           373            -$68,565.0
+```
+
+> **Key Takeaway**: When retention success rate is realistic ($\eta \le 30\%$), outreach costs can easily dominate preserved value unless outreach is highly targeted ($C \le \$15$) or customer value is high. Lowering thresholds identifies more churners (+77 additional churners identified at 0.35 on test data), but also multiplies false-alarm outreach costs.
 
 ---
 
 ## 🔬 Model Interpretability & Error Analysis
 
-Understanding feature influences allows retention teams to craft personalized interventions rather than generic discounts.
-
-### 1. Permutation Importance (Model-Agnostic on Held-Out Data)
-Permutation importance measures the drop in PR-AUC when a feature's values are randomly shuffled on held-out test data (unbiased by cardinality):
-1. `Contract`: Shuffling contract type degrades PR-AUC by **0.0686 ± 0.0037**.
+### 1. Permutation Importance on Held-Out Test Data
+1. `Contract`: Shuffling degrades PR-AUC by **0.0686 ± 0.0037**.
 2. `tenure`: Degradation of **0.0653 ± 0.0070**.
 3. `TotalCharges`: Degradation of **0.0327 ± 0.0070**.
 4. `InternetService`: Degradation of **0.0317 ± 0.0139**.
@@ -379,10 +383,8 @@ The saved model pipeline (`models/best_model.joblib`) encapsulates both feature 
 ```python
 from churn_prediction.predict import ChurnPredictor
 
-# Initialize inference service (loads models/best_model.joblib)
 predictor = ChurnPredictor()
 
-# Single customer payload
 customer = {
     "gender": "Female",
     "SeniorCitizen": 0,
@@ -405,20 +407,13 @@ customer = {
     "TotalCharges": 159.70
 }
 
-# Predict with calibrated operational threshold (0.35)
-result = predictor.predict(customer, threshold=0.35)
+result = predictor.predict(customer, threshold=0.50)
 print(result[["churn_probability", "predicted_churn", "risk_tier", "recommended_action"]])
-```
-
-**Output**:
-```text
-   churn_probability  predicted_churn  risk_tier                                                           recommended_action
-0             0.7159                1  High Risk  Priority retention outreach, incentive offer, check service quality issues.
 ```
 
 ---
 
-## ⚖️ Responsible AI & Sensitive Attributes Safeguards
+## ⚖️ Responsible AI & Demographic Safeguards
 
 The dataset contains demographic features: `gender`, `SeniorCitizen` (age proxy), `Partner`, and `Dependents`.
 
@@ -431,10 +426,6 @@ The dataset contains demographic features: `gender`, `SeniorCitizen` (age proxy)
 ---
 
 ## 💻 Installation & Reproduction Guide
-
-### Prerequisites
-* Python 3.11 or 3.12
-* Git
 
 ```bash
 # 1. Clone repository
@@ -450,7 +441,7 @@ python -m venv .venv
 pip install -r requirements.txt
 pip install -e .
 
-# 4. Run automated test suite (23 tests)
+# 4. Run automated test suite (24 tests)
 python -m pytest
 
 # 5. Run end-to-end pipeline (downloads data, verifies SQL, trains models, saves artifacts)
@@ -459,9 +450,9 @@ python scripts/run_pipeline.py
 
 ---
 
-## 🧪 Automated Testing
+## 🧪 Automated Testing Suite
 
-The automated test suite verifies all critical invariants across 23 unit and audit tests:
+The test suite verifies all critical invariants across 24 unit and audit tests:
 
 ```bash
 python -m pytest
@@ -471,43 +462,53 @@ python -m pytest
 ============================= test session starts =============================
 platform win32 -- Python 3.12.10, pytest-9.1.1 -- D:\tools\python312\python.exe
 testpaths: tests
-collected 23 items
+collected 24 items
 
 tests/test_audit.py::test_threshold_tuning_uses_only_training_data PASSED [  4%]
-tests/test_audit.py::test_cv_statistical_significance_calculator PASSED  [  8%]
-tests/test_audit.py::test_defensible_model_selection_parsimony_strategy PASSED [ 13%]
-tests/test_audit.py::test_defensible_model_selection_tradeoff_strategy PASSED [ 17%]
-tests/test_audit.py::test_average_precision_metric_properties PASSED     [ 21%]
-tests/test_data.py::test_schema_validation_success PASSED                [ 26%]
-tests/test_data.py::test_schema_validation_missing_column PASSED         [ 30%]
-tests/test_data.py::test_schema_validation_duplicate_ids PASSED          [ 34%]
-tests/test_data.py::test_clean_raw_data_handles_blank_total_charges PASSED [ 39%]
-tests/test_data.py::test_target_encoding PASSED                          [ 43%]
-tests/test_data.py::test_prepare_features_and_target_leakage_prevention PASSED [ 47%]
-tests/test_data.py::test_load_raw_data_missing_file_raises_error PASSED  [ 52%]
-tests/test_prediction.py::test_prediction_output_shape_and_probability_bounds PASSED [ 56%]
-tests/test_prediction.py::test_prediction_handles_dictionary_input PASSED [ 60%]
-tests/test_prediction.py::test_prediction_validation_catches_missing_columns PASSED [ 65%]
-tests/test_prediction.py::test_prediction_safely_removes_customer_id_and_churn PASSED [ 69%]
-tests/test_prediction.py::test_predictor_missing_model_file_error PASSED [ 73%]
-tests/test_preprocessing.py::test_build_preprocessor_handles_missing_and_scaling PASSED [ 78%]
-tests/test_preprocessing.py::test_preprocessor_handles_unseen_categories PASSED [ 82%]
-tests/test_preprocessing.py::test_create_train_test_split_stratification_and_seed PASSED [ 86%]
+tests/test_audit.py::test_intervention_sensitivity_analysis PASSED       [  8%]
+tests/test_audit.py::test_cv_statistical_significance_calculator PASSED  [ 12%]
+tests/test_audit.py::test_defensible_model_selection_parsimony_strategy PASSED [ 16%]
+tests/test_audit.py::test_defensible_model_selection_tradeoff_strategy PASSED [ 20%]
+tests/test_audit.py::test_average_precision_metric_properties PASSED     [ 25%]
+tests/test_data.py::test_schema_validation_success PASSED                [ 29%]
+tests/test_data.py::test_schema_validation_missing_column PASSED         [ 33%]
+tests/test_data.py::test_schema_validation_duplicate_ids PASSED          [ 37%]
+tests/test_data.py::test_clean_raw_data_handles_blank_total_charges PASSED [ 41%]
+tests/test_data.py::test_target_encoding PASSED                          [ 45%]
+tests/test_data.py::test_prepare_features_and_target_leakage_prevention PASSED [ 50%]
+tests/test_data.py::test_load_raw_data_missing_file_raises_error PASSED  [ 54%]
+tests/test_prediction.py::test_prediction_output_shape_and_probability_bounds PASSED [ 58%]
+tests/test_prediction.py::test_prediction_handles_dictionary_input PASSED [ 62%]
+tests/test_prediction.py::test_prediction_validation_catches_missing_columns PASSED [ 66%]
+tests/test_prediction.py::test_prediction_safely_removes_customer_id_and_churn PASSED [ 70%]
+tests/test_prediction.py::test_predictor_missing_model_file_error PASSED [ 75%]
+tests/test_preprocessing.py::test_build_preprocessor_handles_missing_and_scaling PASSED [ 79%]
+tests/test_preprocessing.py::test_preprocessor_handles_unseen_categories PASSED [ 83%]
+tests/test_preprocessing.py::test_create_train_test_split_stratification_and_seed PASSED [ 87%]
 tests/test_training.py::test_candidate_models_contain_required_classifiers PASSED [ 91%]
 tests/test_training.py::test_build_model_pipeline_returns_valid_pipeline PASSED [ 95%]
 tests/test_training.py::test_cross_validation_execution PASSED           [100%]
 
-======================== 23 passed, 1 warning in 3.71s ========================
+======================== 24 passed, 1 warning in 3.39s ========================
 ```
 
 ---
 
-## 🔮 Future Improvements
+## 📌 Verified Implementation vs. Unverified Deployment Work
 
-1. **Temporal Validation**: Ingest real longitudinal customer history with explicit snapshot timestamps to test true out-of-time forecasting.
-2. **Network Telemetry Integration**: Merge broadband latency, fiber signal degradation, and dropped call frequency to capture operational drivers of attrition.
-3. **Causal Uplift Modeling**: Train two-model or T-Learner uplift estimators to identify *persuadable* subscribers (those who only stay if contacted) versus *sure things* or *lost causes*.
-4. **FastAPI Microservice**: Expose `ChurnPredictor` via a low-latency asynchronous REST endpoint with OpenTelemetry tracing and Prometheus latency histograms.
+To maintain strict scientific and professional truthfulness, this repository delineates what has been genuinely executed and verified versus what remains future operational work:
+
+| Component | Status | Empirical Evidence / Limitation |
+| :--- | :---: | :--- |
+| **Data Ingestion & Hygiene** | **VERIFIED** | Verified 7,043 rows, SHA256 integrity, 0 duplicate IDs, and logical 0.0 imputation for 11 tenure=0 blank TotalCharges rows. |
+| **SQL Database & Invariant Check** | **VERIFIED** | SQLite ingestion verified; SQL aggregations match Pandas calculations to within 0.01%. |
+| **Test Set Isolation** | **VERIFIED** | Preprocessing, cross-validation, feature ablation, and threshold tuning are performed strictly on training data; held-out test set evaluated once. |
+| **PR-AUC Metric Formulation** | **VERIFIED** | Uses scikit-learn's `average_precision_score` ($\text{AP} = \sum (R_n - R_{n-1}) P_n$). |
+| **Feature Collinearity & Ablation** | **VERIFIED** | Documented $\rho = 0.99956$ between `TotalCharges` and `tenure * MonthlyCharges`, suppressor effect in logistic regression, and measured 5-fold CV ablation impact. |
+| **Statistical Equivalence** | **QUALIFIED** | Corrected resampled $t$-test indicates observed PR-AUC differences ($+0.0035$ to $+0.0044$) are smaller than fold variance ($p > 0.30$). Qualified as non-significant difference rather than definitive proof of equivalence. |
+| **Business Value & Savings** | **HYPOTHETICAL** | Multi-scenario sensitivity analysis implemented. Correct identification does not prove retention success; ROI is hypothetical expected value. |
+| **Prospective Forecast Validity** | **UNVERIFIED LIMITATION** | Dataset lacks timestamps. Prospective out-of-time forecasting over a future window remains unverified and requires longitudinal enterprise event logs. |
+| **Live API & Production Serving** | **FUTURE WORK** | Model serializes and executes locally via Python; containerized microservice deployment with Prometheus monitoring remains future work. |
 
 ---
 

@@ -67,14 +67,22 @@ def analyze_threshold_tradeoffs(
     benefit_tp: float = 80.0,
 ) -> pd.DataFrame:
     """
-    Evaluate precision-recall-f1 trade-offs and net business utility strictly on
+    Evaluate precision-recall-f1 trade-offs and hypothetical expected value strictly on
     out-of-fold training predictions. Never evaluates on the final test set to prevent leakage.
 
-    Business Utility Assumptions:
-        - Cost of False Positive (cost_fp): Cost of unnecessary retention discount or outreach ($20).
-        - Cost of False Negative (cost_fn): Lost customer lifetime gross margin ($100).
-        - Benefit of True Positive (benefit_tp): Net value preserved by successful intervention ($80).
-        - Net Value = (TP * benefit_tp) - (FP * cost_fp) - (FN * cost_fn)
+    SCIENTIFIC QUALIFICATION:
+        The calculated 'hypothetical_expected_value' is a scenario-based expected-value exercise
+        derived from assumed unit parameters. It does NOT represent demonstrated financial return
+        on investment (ROI) or confirmed customer saves, because this dataset contains no
+        intervention history, contact channel records, or randomized uplift trial outcomes.
+        Flagging an at-risk customer (True Positive) does not prove that an outreach action
+        will successfully persuade that customer to remain.
+
+    Assumed Scenario Parameters:
+        - Cost of False Positive (cost_fp): Cost of unnecessary retention discount or outreach ($20 assumed).
+        - Cost of False Negative (cost_fn): Lost customer lifetime gross margin ($100 assumed).
+        - Benefit of True Positive (benefit_tp): Net value preserved under an assumed successful intervention ($80 assumed).
+        - Hypothetical Expected Value = (TP * benefit_tp) - (FP * cost_fp) - (FN * cost_fn)
     """
     if thresholds is None:
         thresholds = [0.20, 0.25, 0.30, 0.35, 0.40, 0.45, 0.50, 0.55, 0.60, 0.70]
@@ -92,13 +100,70 @@ def analyze_threshold_tradeoffs(
                 "precision": round(m["precision"], 4),
                 "recall": round(m["recall"], 4),
                 "f1": round(m["f1"], 4),
-                "true_positives": int(tp),
-                "false_positives": int(fp),
-                "true_negatives": int(tn),
-                "false_negatives": int(fn),
-                "net_business_value": round(float(net_value), 2),
+                "churners_identified_tp": int(tp),
+                "false_alarms_fp": int(fp),
+                "retained_correct_tn": int(tn),
+                "missed_churners_fn": int(fn),
+                "hypothetical_expected_value": round(float(net_value), 2),
             }
         )
+
+    return pd.DataFrame(rows)
+
+
+def run_intervention_sensitivity_analysis(
+    y_train_oof: np.ndarray,
+    probs_oof: np.ndarray,
+    thresholds: Optional[List[float]] = None,
+) -> pd.DataFrame:
+    """
+    Sensitivity analysis over plausible retention intervention scenarios strictly on training OOF predictions.
+    Models the reality that only a fraction (retention success rate eta) of flagged churners can be persuaded to stay.
+
+    Formula:
+        Flagged Accounts = TP + FP
+        Outreach Cost = (TP + FP) * unit_outreach_cost
+        Persuaded Churners = TP * eta
+        Preserved Value = (TP * eta) * customer_value
+        Uncontacted Churn Loss = FN * customer_value
+        Net Expected Value = Preserved Value - Outreach Cost - Uncontacted Churn Loss
+    """
+    if thresholds is None:
+        thresholds = [0.25, 0.35, 0.50]
+
+    scenarios = [
+        {"name": "Conservative", "eta": 0.15, "unit_cost": 25.0, "customer_value": 100.0},
+        {"name": "Moderate", "eta": 0.30, "unit_cost": 20.0, "customer_value": 120.0},
+        {"name": "Optimistic", "eta": 0.50, "unit_cost": 15.0, "customer_value": 150.0},
+    ]
+
+    rows = []
+    for sc in scenarios:
+        eta = sc["eta"]
+        c = sc["unit_cost"]
+        v = sc["customer_value"]
+        for th in thresholds:
+            cm = confusion_matrix(y_train_oof, (probs_oof >= th).astype(int))
+            tn, fp, fn, tp = cm.ravel()
+
+            outreach_cost = (tp + fp) * c
+            preserved_value = tp * eta * v
+            uncontacted_loss = fn * v
+            net_expected_val = preserved_value - outreach_cost - uncontacted_loss
+
+            rows.append(
+                {
+                    "scenario": sc["name"],
+                    "success_rate_eta": f"{int(eta * 100)}%",
+                    "unit_outreach_cost": f"${c:.0f}",
+                    "customer_value": f"${v:.0f}",
+                    "threshold": th,
+                    "churners_identified": int(tp),
+                    "hypothetical_persuaded": round(tp * eta, 1),
+                    "false_alarms": int(fp),
+                    "net_expected_value": round(float(net_expected_val), 2),
+                }
+            )
 
     return pd.DataFrame(rows)
 
