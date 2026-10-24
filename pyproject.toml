@@ -5,12 +5,9 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "customer-churn-prediction"
 version = "1.0.0"
-description = "Production-grade customer churn prediction ML pipeline on IBM Telco dataset"
+description = "Customer churn prediction machine learning project using the IBM Telco dataset"
 readme = "README.md"
 requires-python = ">=3.11"
-authors = [
-    {name = "Senior ML Engineer", email = "mle@example.com"}
-]
 dependencies = [
     "numpy>=2.0.0",
     "pandas>=2.2.0",

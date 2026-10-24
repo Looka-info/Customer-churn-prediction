@@ -1,10 +1,5 @@
 """
-Reusable inference module for predicting customer churn risk.
-
-SECURITY NOTICE:
-    Loading serialized models via `joblib` or `pickle` can execute arbitrary code
-    if the artifact file is untrusted or tampered with. Only load artifacts generated
-    by this verified pipeline and stored in trusted internal storage.
+Inference module for predicting customer churn risk.
 """
 
 import logging
@@ -47,7 +42,7 @@ NUMERIC_COLUMNS = ["tenure", "MonthlyCharges", "TotalCharges"]
 
 
 class ChurnPredictor:
-    """Production-grade churn prediction service wrapper around a fitted scikit-learn Pipeline."""
+    """Wraps a trained scikit-learn pipeline to run inference on customer records."""
 
     def __init__(
         self,
@@ -64,7 +59,7 @@ class ChurnPredictor:
         if not self.model_path.exists():
             raise FileNotFoundError(
                 f"Trained model artifact not found at: {self.model_path}\n"
-                "Please run the training pipeline first: `python scripts/run_pipeline.py`"
+                "Please run the training pipeline first: `python train.py`"
             )
         try:
             self.pipeline = joblib.load(self.model_path)

@@ -73,7 +73,7 @@ def analyze_threshold_tradeoffs(
     Evaluate precision-recall-f1 trade-offs and incremental campaign value strictly on
     out-of-fold training predictions. Never evaluates on the final test set to prevent leakage.
 
-    FINANCIAL UTILITY OBJECTIVE (Option A: Incremental Campaign Value vs. No Outreach):
+    FINANCIAL UTILITY OBJECTIVE (Incremental Campaign Value vs. No Outreach):
         The financial objective is defined strictly as the incremental value of an outreach
         intervention campaign compared to a baseline of no outreach:
             Delta Value = Gross Value Preserved - Total Outreach Cost
@@ -153,10 +153,10 @@ def run_intervention_sensitivity_analysis(
 ) -> pd.DataFrame:
     """
     Sensitivity analysis over plausible retention intervention scenarios strictly on training OOF predictions.
-    Evaluates Option A: Incremental Campaign Value vs. No Outreach across Conservative, Moderate,
+    Evaluates Incremental Campaign Value vs. No Outreach across Conservative, Moderate,
     and Optimistic parameters.
 
-    Option A Formula:
+    Campaign Formula:
         Contacted Accounts = TP + FP
         Persuaded Churners = TP * eta
         Gross Value Preserved = Persuaded Churners * customer_value = (TP * eta) * customer_value

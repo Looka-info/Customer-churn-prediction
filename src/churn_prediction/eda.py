@@ -59,7 +59,7 @@ def generate_all_eda_figures(df: pd.DataFrame, output_dir: Path) -> None:
         for i, val in enumerate(missing_cols.values):
             plt.text(i, val + 0.3, f"{val} records", ha="center", weight="bold")
         plt.ylabel("Missing Count", fontsize=11)
-    plt.title("Data Hygiene: Missing / Blank Value Audit", fontsize=12, pad=12, weight="bold")
+    plt.title("Data Hygiene: Missing / Blank Value Summary", fontsize=12, pad=12, weight="bold")
     plt.tight_layout()
     plt.savefig(output_dir / "missing_values.png", dpi=300)
     plt.close()

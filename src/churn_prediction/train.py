@@ -502,7 +502,7 @@ def select_best_model(
         f"Selected {top_pr_model} because it achieves higher CV Precision (0.6739 vs 0.6530), "
         "reducing false-alarm retention outreach in finite-budget customer success campaigns."
     )
-    logger.info("Model selection audit: %s", rationale["reason"])
+    logger.info("Model selection: %s", rationale["reason"])
     return top_pr_model, rationale
 
 

@@ -70,7 +70,7 @@ def load_raw_data(file_path: Optional[Path] = None) -> pd.DataFrame:
         raise FileNotFoundError(
             f"Dataset not found at: {target_path}\n"
             "Please ensure the official IBM Telco Customer Churn dataset is placed at that path.\n"
-            f"You can automatically download it using `python scripts/download_data.py` or fetch it from:\n"
+            "You can run `python train.py` (which downloads it automatically if missing) or fetch it from:\n"
             f"1) Official IBM repo: {OFFICIAL_TELCO_URL}\n"
             "2) Kaggle: https://www.kaggle.com/datasets/blastchar/telco-customer-churn"
         )

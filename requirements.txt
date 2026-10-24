@@ -14,3 +14,6 @@ joblib>=1.4.0
 
 # Testing and Code Quality
 pytest>=8.0.0
+
+# Dashboard Application
+streamlit>=1.30.0
