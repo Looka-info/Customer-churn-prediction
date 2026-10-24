@@ -1,0 +1,84 @@
+project:
+  name: "Customer Churn Prediction"
+  version: "1.0.0"
+  description: "End-to-end production-quality machine learning pipeline to predict customer churn on the IBM Telco dataset."
+
+environment:
+  random_seed: 42
+
+paths:
+  raw_data: "data/raw/WA_Fn-UseC_-Telco-Customer-Churn.csv"
+  processed_dir: "data/processed"
+  database: "data/churn_analysis.db"
+  models_dir: "models"
+  best_model_path: "models/best_model.joblib"
+  reports_dir: "reports"
+  figures_dir: "reports/figures"
+  metrics_comparison: "reports/model_comparison.csv"
+  sql_schema: "sql/schema.sql"
+  sql_queries: "sql/analysis_queries.sql"
+
+data:
+  id_column: "customerID"
+  target_column: "Churn"
+  positive_label: "Yes"
+  negative_label: "No"
+  test_size: 0.20
+  cv_folds: 5
+  stratify: true
+
+  # Numerical features to be imputed and scaled
+  numeric_features:
+    - "tenure"
+    - "MonthlyCharges"
+    - "TotalCharges"
+
+  # Categorical features to be imputed and one-hot encoded
+  categorical_features:
+    - "gender"
+    - "SeniorCitizen"
+    - "Partner"
+    - "Dependents"
+    - "PhoneService"
+    - "MultipleLines"
+    - "InternetService"
+    - "OnlineSecurity"
+    - "OnlineBackup"
+    - "DeviceProtection"
+    - "TechSupport"
+    - "StreamingTV"
+    - "StreamingMovies"
+    - "Contract"
+    - "PaperlessBilling"
+    - "PaymentMethod"
+
+models:
+  logistic_regression:
+    C: 1.0
+    solver: "lbfgs"
+    max_iter: 1000
+    class_weight: null
+
+  random_forest:
+    n_estimators: 150
+    max_depth: 8
+    min_samples_split: 5
+    min_samples_leaf: 2
+    class_weight: null
+
+  gradient_boosting:
+    n_estimators: 100
+    learning_rate: 0.08
+    max_depth: 4
+    min_samples_split: 5
+    min_samples_leaf: 2
+    subsample: 0.85
+
+evaluation:
+  default_threshold: 0.50
+  metrics:
+    - "precision"
+    - "recall"
+    - "f1"
+    - "average_precision"
+    - "roc_auc"

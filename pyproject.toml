@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "customer-churn-prediction"
+version = "1.0.0"
+description = "Production-grade customer churn prediction ML pipeline on IBM Telco dataset"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [
+    {name = "Senior ML Engineer", email = "mle@example.com"}
+]
+dependencies = [
+    "numpy>=2.0.0",
+    "pandas>=2.2.0",
+    "scipy>=1.12.0",
+    "scikit-learn>=1.5.0",
+    "matplotlib>=3.9.0",
+    "seaborn>=0.13.0",
+    "pyyaml>=6.0.0",
+    "joblib>=1.4.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+addopts = "-v"
