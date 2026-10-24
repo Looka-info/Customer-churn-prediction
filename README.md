@@ -65,9 +65,9 @@ A key engineering consideration with this dataset is understanding its temporal 
 
 To build and evaluate a genuine prospective churn prediction model in a real company, you would need:
 1. **Longitudinal event timestamps**: Exact dates for logins, support tickets, billing charges, and cancellations.
-2. **Observation window ($[T_0, T_{\text{obs}}]$)**: A historical period (e.g., 90 days) where features like usage trends and support calls are calculated.
-3. **Buffer / action window ($[T_{\text{obs}}, T_{\text{target\_start}}]$)**: A 7–14 day operational gap allowing teams to contact the customer before the churn period begins.
-4. **Outcome window ($[T_{\text{target\_start}}, T_{\text{target\_end}}]$)**: A forward-looking period (e.g., next 30–60 days) where churn is officially recorded.
+2. **Observation window (`[T_0, T_obs]`)**: A historical period (e.g., 90 days) where features like usage trends and support calls are calculated.
+3. **Buffer / action window (`[T_obs, T_action]`)**: A 7–14 day operational gap allowing teams to contact the customer before the churn period begins.
+4. **Outcome window (`[T_action, T_outcome]`)**: A forward-looking period (e.g., next 30–60 days) where churn is officially recorded.
 5. **Temporal out-of-time splits**: Training on historical time periods and evaluating on future periods to measure how model performance degrades over time.
 
 ---
@@ -113,12 +113,25 @@ Exploring the data revealed several strong patterns associated with customer chu
 | **Internet Service** | Fiber optic | 41.9% | No internet | 7.4% |
 | **Tech Support** | No Tech Support | 41.6% | Tech Support active | 15.2% |
 
-All exploratory charts are generated programmatically and saved in `reports/figures/`:
-* `reports/figures/target_distribution.png`
-* `reports/figures/numerical_distributions.png`
-* `reports/figures/churn_by_contract.png`
-* `reports/figures/churn_by_payment_method.png`
-* `reports/figures/correlation_heatmap.png`
+### Exploratory Visualizations
+
+| Target Class Distribution | Missing Values Summary |
+| :---: | :---: |
+| <img src="reports/figures/target_distribution.png" width="450" alt="Target Distribution"> | <img src="reports/figures/missing_values.png" width="450" alt="Missing Values Summary"> |
+
+| Churn by Contract Type | Churn by Payment Method |
+| :---: | :---: |
+| <img src="reports/figures/churn_by_contract.png" width="450" alt="Churn by Contract"> | <img src="reports/figures/churn_by_payment_method.png" width="450" alt="Churn by Payment Method"> |
+
+#### Numerical Feature Distributions
+<p align="center">
+  <img src="reports/figures/numerical_distributions.png" width="900" alt="Numerical Distributions">
+</p>
+
+#### Feature Correlation Heatmap
+<p align="center">
+  <img src="reports/figures/correlation_heatmap.png" width="750" alt="Feature Correlation Heatmap">
+</p>
 
 ---
 
@@ -267,6 +280,10 @@ While Logistic Regression is simpler and achieves slightly higher recall at the 
 * **Test Recall**: $51.34\%$
 * **Test F1**: $58.36\%$
 
+| Precision-Recall & ROC Curves | Held-Out Test Confusion Matrix |
+| :---: | :---: |
+| <img src="reports/figures/pr_roc_curves.png" width="450" alt="PR and ROC Curves"> | <img src="reports/figures/confusion_matrix.png" width="450" alt="Confusion Matrix"> |
+
 ---
 
 ## Decision Thresholds & Business Utility
@@ -338,6 +355,10 @@ I computed permutation feature importance on the held-out test set by shuffling 
 5. `TechSupport`: Degradation of **0.0234 ± 0.0051**.
 
 `Contract` and `tenure` are by far the strongest drivers of churn prediction.
+
+<p align="center">
+  <img src="reports/figures/feature_importance.png" width="750" alt="Top Predictive Features">
+</p>
 
 ### 2. Error Analysis: Where Does the Model Fail?
 To understand the model's limitations, I inspected the false positives and false negatives on the test set:
