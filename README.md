@@ -532,3 +532,5 @@ Documenting what didn't work and recognizing the boundaries of the analysis is j
 ## License & Attribution
 * The code, pipeline, tests, and documentation in this repository are licensed under the [MIT License](LICENSE).
 * The underlying IBM Telco Customer Churn dataset is property of IBM Corporation and is used here for educational and portfolio demonstration.
+#   C u s t o m e r - c h u r n - p r e d i c t i o n  
+ 
