@@ -99,5 +99,6 @@ def test_cross_validation_execution(synthetic_training_data):
     ]:
         assert col in cv_df.columns
 
-    best_model = select_best_model(cv_df)
+    best_model, rationale = select_best_model(cv_df)
     assert best_model in ["Logistic Regression", "Random Forest", "Gradient Boosting"]
+    assert "reason" in rationale

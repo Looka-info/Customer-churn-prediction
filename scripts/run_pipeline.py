@@ -135,23 +135,47 @@ def run_pipeline() -> None:
     # Step 6: 5-Fold Stratified Cross-Validation of 3 Candidates
     logger.info("--- Step 6: Stratified Cross-Validation on Training Data ---")
     cv_summary, oof_preds = cross_validate_candidates(X_train, y_train, config)
-    print("\n" + "=" * 70)
+    print("\n" + "=" * 75)
     print("STRATIFIED 5-FOLD CROSS-VALIDATION RESULTS (TRAINING DATA ONLY)")
-    print("=" * 70)
+    print("=" * 75)
     print(cv_summary.to_string(index=False))
-    print("=" * 70 + "\n")
+    print("=" * 75 + "\n")
 
-    # Step 7: Model Selection
-    best_model_name = select_best_model(cv_summary)
+    # Statistical Significance Audit (Paired t-test across CV folds vs Baseline)
+    from churn_prediction.train import compute_cv_statistical_significance
+    sig_pr = compute_cv_statistical_significance(oof_preds, baseline_model="Logistic Regression", metric_key="fold_pr_aucs")
+    sig_roc = compute_cv_statistical_significance(oof_preds, baseline_model="Logistic Regression", metric_key="fold_roc_aucs")
+    print("STATISTICAL SIGNIFICANCE vs LOGISTIC REGRESSION BASELINE (PR-AUC):")
+    print(sig_pr.to_string(index=False))
+    print("\nSTATISTICAL SIGNIFICANCE vs LOGISTIC REGRESSION BASELINE (ROC-AUC):")
+    print(sig_roc.to_string(index=False))
+    print()
 
-    # Threshold analysis on out-of-fold predictions
+    # Step 7: Defensible Model Selection
+    logger.info("--- Step 7: Defensible Model Selection & Uncertainty Audit ---")
+    best_model_name, selection_audit = select_best_model(cv_summary, oof_predictions=oof_preds)
+    logger.info("Selected Model: %s", best_model_name)
+    logger.info("Selection Rationale: %s", selection_audit["reason"])
+
+    # Threshold analysis on training out-of-fold predictions
     best_oof = oof_preds[best_model_name]
     threshold_analysis = analyze_threshold_tradeoffs(
         best_oof["y_true"], best_oof["oof_probabilities"]
     )
+    print("\n" + "=" * 80)
+    print("TRAINING-SIDE OUT-OF-FOLD THRESHOLD & BUSINESS UTILITY TRADE-OFFS")
+    print("=" * 80)
+    print(threshold_analysis.to_string(index=False))
+    print("=" * 80)
+
+    best_thresh_idx = threshold_analysis["net_business_value"].idxmax()
+    optimal_thresh = float(threshold_analysis.loc[best_thresh_idx, "threshold"])
     logger.info(
-        "Threshold analysis on training out-of-fold predictions:\n%s",
-        threshold_analysis.to_string(index=False),
+        "Training-side optimal economic threshold: %.2f (Net Value: $%,.2f, Recall: %.1f%%, Precision: %.1f%%)",
+        optimal_thresh,
+        threshold_analysis.loc[best_thresh_idx, "net_business_value"],
+        threshold_analysis.loc[best_thresh_idx, "recall"] * 100,
+        threshold_analysis.loc[best_thresh_idx, "precision"] * 100,
     )
 
     # Step 8: Train all candidate models on full training set and evaluate on held-out test set

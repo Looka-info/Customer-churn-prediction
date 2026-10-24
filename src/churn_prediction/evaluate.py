@@ -31,7 +31,15 @@ def compute_metrics(
     y_probs: np.ndarray,
     threshold: float = 0.50,
 ) -> Dict[str, float]:
-    """Calculate comprehensive classification metrics for positive class (Churn=1)."""
+    """
+    Calculate comprehensive classification metrics for the positive class (Churn=1).
+
+    NOTE ON PR-AUC METHODOLOGY:
+        The 'pr_auc' metric uses `sklearn.metrics.average_precision_score`, which calculates
+        the weighted mean of precisions at each threshold (AP = sum (R_n - R_{n-1}) * P_n).
+        This is preferred over trapezoidal interpolation (`auc(recall, precision)`),
+        which can yield optimistic overestimates on non-monotonic precision-recall curves.
+    """
     y_preds = (y_probs >= threshold).astype(int)
 
     precision = float(precision_score(y_true, y_preds, zero_division=0))
@@ -54,29 +62,41 @@ def analyze_threshold_tradeoffs(
     y_train_oof: np.ndarray,
     probs_oof: np.ndarray,
     thresholds: Optional[List[float]] = None,
+    cost_fp: float = 20.0,
+    cost_fn: float = 100.0,
+    benefit_tp: float = 80.0,
 ) -> pd.DataFrame:
     """
-    Evaluate precision-recall-f1 trade-offs strictly on out-of-fold training predictions.
-    Never evaluates on the final test set to prevent leakage.
+    Evaluate precision-recall-f1 trade-offs and net business utility strictly on
+    out-of-fold training predictions. Never evaluates on the final test set to prevent leakage.
+
+    Business Utility Assumptions:
+        - Cost of False Positive (cost_fp): Cost of unnecessary retention discount or outreach ($20).
+        - Cost of False Negative (cost_fn): Lost customer lifetime gross margin ($100).
+        - Benefit of True Positive (benefit_tp): Net value preserved by successful intervention ($80).
+        - Net Value = (TP * benefit_tp) - (FP * cost_fp) - (FN * cost_fn)
     """
     if thresholds is None:
-        thresholds = [0.20, 0.30, 0.35, 0.40, 0.45, 0.50, 0.55, 0.60, 0.70]
+        thresholds = [0.20, 0.25, 0.30, 0.35, 0.40, 0.45, 0.50, 0.55, 0.60, 0.70]
 
     rows = []
     for th in thresholds:
         m = compute_metrics(y_train_oof, probs_oof, threshold=th)
         cm = confusion_matrix(y_train_oof, (probs_oof >= th).astype(int))
         tn, fp, fn, tp = cm.ravel()
+        net_value = (tp * benefit_tp) - (fp * cost_fp) - (fn * cost_fn)
+
         rows.append(
             {
                 "threshold": th,
-                "precision": m["precision"],
-                "recall": m["recall"],
-                "f1": m["f1"],
+                "precision": round(m["precision"], 4),
+                "recall": round(m["recall"], 4),
+                "f1": round(m["f1"], 4),
                 "true_positives": int(tp),
                 "false_positives": int(fp),
                 "true_negatives": int(tn),
                 "false_negatives": int(fn),
+                "net_business_value": round(float(net_value), 2),
             }
         )
 
