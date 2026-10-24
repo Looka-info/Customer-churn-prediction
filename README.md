@@ -1,5 +1,11 @@
 # Customer Churn Prediction
 
+[![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python)](https://www.python.org/)
+[![scikit-learn](https://img.shields.io/badge/scikit--learn-1.4%2B-orange?logo=scikit-learn)](https://scikit-learn.org/)
+[![Streamlit](https://img.shields.io/badge/Streamlit-1.32%2B-red?logo=streamlit)](https://streamlit.io/)
+[![Tests](https://img.shields.io/badge/Tests-38%20Passed-brightgreen?logo=pytest)](https://docs.pytest.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green)](LICENSE)
+
 I built this project to understand how machine learning can be used to predict customer churn. I used the IBM Telco Customer Churn dataset, explored the data, trained three classification models, compared their performance, and created a reusable prediction pipeline.
 
 Customer churn is one of the classic tabular classification problems in data science. It has practical challenges that make it an excellent learning project: the classes are imbalanced (roughly 26.5% of customers churned), false positives and false negatives carry very different operational costs, and simple accuracy is misleading. Throughout this project, I focused on building a clean and reproducible workflow, preventing data leakage, evaluating models rigorously using cross-validation and statistical tests, and analyzing the trade-offs involved in operational decision-making.
@@ -22,6 +28,7 @@ Customer churn is one of the classic tabular classification problems in data sci
 13. [Project Structure](#project-structure)
 14. [How to Run the Project](#how-to-run-the-project)
 15. [What Did Not Work & What I Would Improve Next](#what-did-not-work--what-i-would-improve-next)
+16. [License & Attribution](#license--attribution)
 
 ---
 
@@ -455,7 +462,7 @@ customer-churn-prediction/
 
 ### 1. Clone the repository and set up environment
 ```bash
-git clone https://github.com/your-username/customer-churn-prediction.git
+git clone https://github.com/Looka-info/Customer-churn-prediction.git
 cd customer-churn-prediction
 
 python -m venv .venv
@@ -532,5 +539,3 @@ Documenting what didn't work and recognizing the boundaries of the analysis is j
 ## License & Attribution
 * The code, pipeline, tests, and documentation in this repository are licensed under the [MIT License](LICENSE).
 * The underlying IBM Telco Customer Churn dataset is property of IBM Corporation and is used here for educational and portfolio demonstration.
-#   C u s t o m e r - c h u r n - p r e d i c t i o n  
- 
